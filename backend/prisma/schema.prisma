@@ -1,0 +1,52 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Room {
+  code String @id
+}
+
+model RoomParticipant {
+  roomCode    String
+  playerName  String
+
+  @@id([roomCode, playerName])
+}
+
+model RoomScrambles {
+  roomCode    String
+  date        DateTime
+  scrambles   String
+
+  @@id([roomCode, date])
+}
+
+model RoomStatistics {
+  roomCode    String
+  playerName  String
+  date        DateTime
+  ao5         Float
+  ao12        Float
+  bestSolve   Float
+
+  @@id([roomCode, playerName, date])
+}
+
+model RoomLeaderboard {
+  roomCode    String
+  playerName  String
+  playerScore Int
+
+  @@id([roomCode, playerName])
+}

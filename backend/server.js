@@ -2,6 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import { PrismaClient } from '@prisma/client';
 import roomRoutes from './routes/roomRoutes.js';
+import leaderboardRoutes from './routes/leaderboardRoutes.js';
+import './cronJobs/updateLeaderboard.js';
 
 const app = express();
 const prisma = new PrismaClient();
@@ -13,6 +15,7 @@ app.use(express.json());
 
 // Routes
 app.use('/api/roomRoutes', roomRoutes);
+app.use('/api/leaderboard', leaderboardRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

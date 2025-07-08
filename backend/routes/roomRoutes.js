@@ -230,10 +230,10 @@ router.get("/:roomCode/daily-leaderboard", async (req, res) => {
     // Format the leaderboard data
     const leaderboard = todayStats.map((stat, index) => ({
       rank: index + 1,
-      playerName: stat.playerName,
+      username: stat.playerName,
       ao5: stat.ao5,
       ao12: stat.ao12,
-      bestSolve: stat.bestSolve,
+      bestSingle: stat.bestSolve,
       date: stat.date,
     }));
 

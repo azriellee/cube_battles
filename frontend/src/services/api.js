@@ -123,12 +123,12 @@ export const sendPlayerStatistics = async (
     const response = await api.post("/updateStatistics", {
       roomCode,
       playerName,
-      date: date instanceof Date ? date.toISOString() : date,
+      date,
       ao5,
       ao12,
       bestSolve,
     });
-    return response; // Note: already .data due to interceptor
+    return response;
   } catch (error) {
     console.error("Error sending player statistics:", error);
     throw error;

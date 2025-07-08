@@ -55,15 +55,15 @@ function RoomPage() {
 
   // Check if leaderboard should be shown (once per day)
   const shouldShowLeaderboard = () => {
-    const today = new Date().toDateString();
+    const todayUtc = new Date().toISOString().split("T")[0];
     const lastShownDate = localStorage.getItem(`leaderboard_shown_${roomCode}`);
-    return lastShownDate !== today;
+    return lastShownDate !== todayUtc;
   };
 
   // Mark leaderboard as shown today
   const markLeaderboardAsShown = () => {
-    const today = new Date().toDateString();
-    localStorage.setItem(`leaderboard_shown_${roomCode}`, today);
+    const todayUtc = new Date().toISOString().split("T")[0];
+    localStorage.setItem(`leaderboard_shown_${roomCode}`, todayUtc);
   };
 
   // Fetch daily leaderboard
@@ -73,7 +73,7 @@ function RoomPage() {
     setIsLoadingLeaderboard(true);
     try {
       const response = await getDailyLeaderboard(roomCode);
-      setLeaderboardData(response || []);
+      setLeaderboardData(response.leaderboard || []);
 
       // Save to local storage
       saveDailyLeaderboardToStorage(roomCode, response || []);
@@ -89,7 +89,7 @@ function RoomPage() {
       // Try to load from local storage as fallback
       const storedLeaderboard = getDailyLeaderboardFromStorage(roomCode);
       if (storedLeaderboard) {
-        setLeaderboardData(storedLeaderboard);
+        setLeaderboardData(storedLeaderboard.leaderboard || []);
 
         // Still show popup if it's the first time today
         if (shouldShowLeaderboard()) {
@@ -136,7 +136,6 @@ function RoomPage() {
     if (statisticsSubmitted) return; // Prevent duplicate submissions
 
     try {
-      const currentDate = new Date();
       const finalBestSingle = getBestSingle(solveTimes);
       const finalAO5 = bestAO5 || calculateAverage(solveTimes, 5);
       const finalAO12 = bestAO12 || calculateAverage(solveTimes, 12);
@@ -144,7 +143,7 @@ function RoomPage() {
       await sendPlayerStatistics(
         roomCode,
         username,
-        currentDate,
+        new Date().toISOString(),
         finalAO5,
         finalAO12,
         finalBestSingle

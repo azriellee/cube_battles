@@ -1,7 +1,7 @@
 // src/services/api.js
 import axios from "axios";
 
-const API_BASE_URL = "http://localhost:3001/api/roomRoutes";
+const API_BASE_URL = "http://localhost:3001/api";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -37,10 +37,12 @@ api.interceptors.response.use(
   }
 );
 
+/* Room API calls */
+
 // Create a new room
 export const createRoom = async () => {
   try {
-    const response = await api.post("/create");
+    const response = await api.post("/roomRoutes/create");
     return response;
   } catch (error) {
     throw error;
@@ -50,7 +52,7 @@ export const createRoom = async () => {
 // Join an existing room
 export const joinRoom = async (roomCode) => {
   try {
-    const response = await api.post("/join", { roomCode });
+    const response = await api.post("/roomRoutes/join", { roomCode });
     return response;
   } catch (error) {
     throw error;
@@ -60,7 +62,7 @@ export const joinRoom = async (roomCode) => {
 // Submit a username for the room
 export const submitUsername = async (roomCode, username) => {
   try {
-    const response = await api.post("/submit-username", { roomCode, username });
+    const response = await api.post("/roomRoutes/submit-username", { roomCode, username });
     return { success: true, data: response }; // Note: response is already .data due to interceptor
   } catch (error) {
     if (error.response) {
@@ -93,17 +95,7 @@ export const submitUsername = async (roomCode, username) => {
 // Get scrambles for a room
 export const getRoomScrambles = async (roomCode) => {
   try {
-    const response = await api.get(`/${roomCode}/scrambles`);
-    return response;
-  } catch (error) {
-    throw error;
-  }
-};
-
-// Get daily leaderboard data
-export const getDailyLeaderboard = async (roomCode) => {
-  try {
-    const response = await api.get(`/${roomCode}/daily-leaderboard`);
+    const response = await api.get(`/roomRoutes/${roomCode}/scrambles`);
     return response;
   } catch (error) {
     throw error;
@@ -120,7 +112,7 @@ export const sendPlayerStatistics = async (
   bestSolve
 ) => {
   try {
-    const response = await api.post("/updateStatistics", {
+    const response = await api.post("/roomRoutes/updateStatistics", {
       roomCode,
       playerName,
       date,
@@ -131,6 +123,28 @@ export const sendPlayerStatistics = async (
     return response;
   } catch (error) {
     console.error("Error sending player statistics:", error);
+    throw error;
+  }
+};
+
+/* Leaderboard API calls */
+
+// Get daily leaderboard data
+export const getDailyLeaderboard = async (roomCode) => {
+  try {
+    const response = await api.get(`/leaderboard/daily-leaderboard/${roomCode}`);
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// Get weekly leaderboard data
+export const getWeeklyLeaderboard = async (roomCode) => {
+  try {
+    const response = await api.get(`/leaderboard/weekly-leaderboard/${roomCode}`);
+    return response;
+  } catch (error) {
     throw error;
   }
 };

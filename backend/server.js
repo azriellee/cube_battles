@@ -3,7 +3,7 @@ import cors from 'cors';
 import { PrismaClient } from '@prisma/client';
 import roomRoutes from './routes/roomRoutes.js';
 import leaderboardRoutes from './routes/leaderboardRoutes.js';
-import './cronJobs/updateLeaderboard.js';
+import './cron_jobs/updateLeaderboard.js';
 
 const app = express();
 const prisma = new PrismaClient();

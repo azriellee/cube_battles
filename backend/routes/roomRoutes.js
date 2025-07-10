@@ -16,24 +16,6 @@ const generateRoomCode = () => {
   return result;
 };
 
-const getPreviousDayDateRange = () => {
-  const now = new Date();
-  const startOfDay = new Date(
-    Date.UTC(
-      now.getUTCFullYear(),
-      now.getUTCMonth(),
-      now.getUTCDate() - 1,
-      0,
-      0,
-      0
-    )
-  );
-  const endOfDay = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0)
-  );
-  return { startOfDay, endOfDay };
-};
-
 // Create a new room
 router.post("/create", async (req, res) => {
   try {
@@ -186,68 +168,6 @@ router.get("/:roomCode/scrambles", async (req, res) => {
     console.error("Error fetching room info:", error);
     res.status(500).json({
       error: "Failed to fetch room information",
-      details: error.message,
-    });
-  }
-});
-
-// Get daily leaderboard for a room
-router.get("/:roomCode/daily-leaderboard", async (req, res) => {
-  try {
-    const { roomCode } = req.params;
-
-    // Check if room exists
-    const room = await prisma.room.findUnique({
-      where: { code: roomCode.toUpperCase() },
-    });
-
-    if (!room) {
-      return res.status(404).json({
-        error: "Room not found",
-        message: "The room code you entered does not exist",
-      });
-    }
-
-    // Get today's date range
-    const { startOfDay, endOfDay } = getPreviousDayDateRange();
-    // console.log(startOfDay, endOfDay);
-    // Fetch today's statistics for the room
-    const todayStats = await prisma.roomStatistics.findMany({
-      where: {
-        roomCode: roomCode.toUpperCase(),
-        date: {
-          gte: startOfDay,
-          lt: endOfDay,
-        },
-      },
-      orderBy: [
-        { ao5: "asc" }, // Best AO5 first (ascending - lower is better)
-        { ao12: "asc" }, // Then best AO12
-        { bestSolve: "asc" }, // Then best single solve
-      ],
-    });
-
-    // Format the leaderboard data
-    const leaderboard = todayStats.map((stat, index) => ({
-      rank: index + 1,
-      username: stat.playerName,
-      ao5: stat.ao5,
-      ao12: stat.ao12,
-      bestSingle: stat.bestSolve,
-      date: stat.date,
-    }));
-
-    res.json({
-      success: true,
-      roomCode: roomCode.toUpperCase(),
-      date: startOfDay.toISOString().split("T")[0],
-      leaderboard,
-      totalPlayers: leaderboard.length,
-    });
-  } catch (error) {
-    console.error("Error fetching daily leaderboard:", error);
-    res.status(500).json({
-      error: "Failed to fetch daily leaderboard",
       details: error.message,
     });
   }

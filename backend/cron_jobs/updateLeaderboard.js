@@ -4,19 +4,18 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-// Function to calculate and update daily leaderboard
-async function updateDailyLeaderboard() {
+// Function to calculate and update daily leaderboard and weekly leaderboard points
+async function updateLeaderboardData() {
   try {
     console.log('Starting daily leaderboard update...');
     
-    // get yesterday's date range in UTC, since the frontend uses UTC timing
     const now = new Date();
     const yesterday = new Date(Date.UTC(
       now.getUTCFullYear(),
       now.getUTCMonth(),
       now.getUTCDate() - 1,
       0, 0, 0, 0
-    )); 
+    ));
     
     const endOfYesterday = new Date(Date.UTC(
       now.getUTCFullYear(),
@@ -25,7 +24,6 @@ async function updateDailyLeaderboard() {
       23, 59, 59, 999
     ));
     
-    // Get all statistics from yesterday
     const yesterdayStats = await prisma.roomStatistics.findMany({
       where: {
         date: {
@@ -39,62 +37,41 @@ async function updateDailyLeaderboard() {
       console.log('No statistics found for yesterday');
       return;
     }
-    
-    // Group by room code
+
     const roomGroups = {};
     yesterdayStats.forEach(stat => {
       if (!roomGroups[stat.roomCode]) {
         roomGroups[stat.roomCode] = [];
       }
       roomGroups[stat.roomCode].push(stat);
+      console.log(`Grouped stat for room ${stat.roomCode}:`, stat);
     });
-    
-    // Process each room
+
     for (const [roomCode, stats] of Object.entries(roomGroups)) {
       console.log(`Processing room: ${roomCode}`);
-      
-      // Find best performers in each category
-      const bestSolveWinner = stats.reduce((best, current) => 
-        current.bestSolve < best.bestSolve ? current : best
+
+      const bestSolveWinner = stats.reduce((best, curr) =>
+        curr.bestSolve < best.bestSolve ? curr : best
       );
-      
-      const bestAo5Winner = stats.reduce((best, current) => 
-        current.ao5 < best.ao5 ? current : best
+
+      const bestAo5Winner = stats.reduce((best, curr) =>
+        curr.ao5 < best.ao5 ? curr : best
       );
-      
-      const bestAo12Winner = stats.reduce((best, current) => 
-        current.ao12 < best.ao12 ? current : best
+
+      const bestAo12Winner = stats.reduce((best, curr) =>
+        curr.ao12 < best.ao12 ? curr : best
       );
-      
-      // Award points
+
       const pointsToAward = {};
-      
-      // Best solve: 4 points
-      if (!pointsToAward[bestSolveWinner.playerName]) {
-        pointsToAward[bestSolveWinner.playerName] = 0;
-      }
-      pointsToAward[bestSolveWinner.playerName] += 4;
-      
-      // Best ao5: 3 points
-      if (!pointsToAward[bestAo5Winner.playerName]) {
-        pointsToAward[bestAo5Winner.playerName] = 0;
-      }
-      pointsToAward[bestAo5Winner.playerName] += 3;
-      
-      // Best ao12: 3 points
-      if (!pointsToAward[bestAo12Winner.playerName]) {
-        pointsToAward[bestAo12Winner.playerName] = 0;
-      }
-      pointsToAward[bestAo12Winner.playerName] += 3;
-      
-      // Update leaderboard
+
+      pointsToAward[bestSolveWinner.playerName] = (pointsToAward[bestSolveWinner.playerName] || 0) + 4;
+      pointsToAward[bestAo5Winner.playerName] = (pointsToAward[bestAo5Winner.playerName] || 0) + 3;
+      pointsToAward[bestAo12Winner.playerName] = (pointsToAward[bestAo12Winner.playerName] || 0) + 3;
+
       for (const [playerName, points] of Object.entries(pointsToAward)) {
         await prisma.roomLeaderboard.upsert({
           where: {
-            roomCode_playerName: {
-              roomCode,
-              playerName
-            }
+            roomCode_playerName: { roomCode, playerName }
           },
           update: {
             playerScore: {
@@ -107,26 +84,35 @@ async function updateDailyLeaderboard() {
             playerScore: points
           }
         });
-        
+
+        await prisma.roomStatistics.updateMany({
+          where: {
+            roomCode,
+            playerName,
+            date: {
+              gte: yesterday,
+              lte: endOfYesterday
+            }
+          },
+          data: {
+            dailyPoints: points
+          }
+        });
+
         console.log(`Awarded ${points} points to ${playerName} in room ${roomCode}`);
       }
     }
-    
-    console.log('Daily leaderboard update completed successfully');
-    
+
+    console.log('✅ Daily leaderboard update completed successfully');
   } catch (error) {
-    console.error('Error updating daily leaderboard:', error);
+    console.error('❌ Error updating daily leaderboard:', error);
   }
 }
 
-// Schedule the job to run every day at 00:01 UTC
-cron.schedule('1 0 * * *', updateDailyLeaderboard, {
+cron.schedule('1 0 * * *', updateLeaderboardData, {
   timezone: 'UTC'
 });
 
-// Optional: Run immediately when server starts (for testing)
-// updateDailyLeaderboard();
-
 console.log('Daily leaderboard cron job scheduled for 00:01 UTC');
 
-export { updateDailyLeaderboard };
+export { updateLeaderboardData };

@@ -206,8 +206,10 @@ export const getBestAverageFromStorage = (roomCode, type) => {
   }
 };
 
-export const saveDailyLeaderboardToStorage = (roomCode, leaderboardData) => {
-  localStorage.setItem(`daily_leaderboard_${roomCode}`, JSON.stringify(leaderboardData));
+/* Leaderboard Storage Functions */
+
+export const saveDailyLeaderboardToStorage = (roomCode, dailyLeaderboardData) => {
+  localStorage.setItem(`daily_leaderboard_${roomCode}`, JSON.stringify(dailyLeaderboardData));
 };
 
 
@@ -222,6 +224,22 @@ export const getDailyLeaderboardFromStorage = (roomCode) => {
       return data.leaderboard;
     }
     return null; // Return null if it's from a different day
+  } catch (error) {
+    console.error("Error getting daily leaderboard from storage:", error);
+    return null;
+  }
+};
+
+export const saveWeeklyLeaderboardToStorage = (roomCode, leaderboardData) => {
+  localStorage.setItem(`weekly_leaderboard_${roomCode}`, JSON.stringify(leaderboardData));
+};
+
+export const getWeeklyLeaderboardFromStorage = (roomCode) => {
+  try {
+    const stored = localStorage.getItem(`weekly_leaderboard_${roomCode}`);
+    if (!stored) return null; 
+    const data = JSON.parse(stored);
+    return data;
   } catch (error) {
     console.error("Error getting daily leaderboard from storage:", error);
     return null;

@@ -2,9 +2,10 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   getRoomScrambles,
+  submitUsername,
   sendPlayerStatistics,
   getDailyLeaderboard,
-  submitUsername,
+  getWeeklyLeaderboard,
 } from "../services/api";
 import {
   saveUsernameToStorage,
@@ -45,6 +46,11 @@ function RoomPage() {
   const [showLeaderboardPopup, setShowLeaderboardPopup] = useState(false);
   const [leaderboardData, setLeaderboardData] = useState([]);
   const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(false);
+
+  // Weekly leaderboard states
+  const [weeklyLeaderboardData, setWeeklyLeaderboardData] = useState([]);
+  const [isLoadingWeeklyLeaderboard, setIsLoadingWeeklyLeaderboard] =
+    useState(false);
 
   // Timer states
   const [activeScramble, setActiveScramble] = useState(null);
@@ -102,15 +108,37 @@ function RoomPage() {
     }
   };
 
+  const fetchWeeklyLeaderboard = async () => {
+    if (!roomCode) return;
+
+    setIsLoadingWeeklyLeaderboard(true);
+    try {
+      const response = await getWeeklyLeaderboard(roomCode);
+      setWeeklyLeaderboardData(response || []);
+
+      // Save to local storage
+      saveWeeklyLeaderboardToStorage(roomCode, response || []);
+    } catch (error) {
+      console.error("Failed to fetch weekly leaderboard:", error);
+
+      // Try to load from local storage as fallback
+      const storedLeaderboard = getWeeklyLeaderboardFromStorage(roomCode);
+      if (storedLeaderboard !== null && storedLeaderboard !== undefined) {
+        setWeeklyLeaderboardData(storedLeaderboard);
+      }
+    } finally {
+      setIsLoadingWeeklyLeaderboard(false);
+    }
+  };
+
   useEffect(() => {
     if (roomCode) {
-      // Check if user already has a username for this room
       const storedUsername = getUsernameFromStorage(roomCode);
       if (storedUsername) {
         setUsername(storedUsername);
         fetchScrambles();
-        // Fetch leaderboard after username is set
         fetchDailyLeaderboard();
+        fetchWeeklyLeaderboard();
       } else {
         setShowUsernamePopup(true);
         setIsLoading(false);
@@ -403,6 +431,7 @@ function RoomPage() {
         setShowUsernamePopup(false);
         fetchScrambles();
         fetchDailyLeaderboard();
+        fetchWeeklyLeaderboard();
       } else {
         // Handle case where API returns success: false
         setUsernameError(
@@ -472,7 +501,7 @@ function RoomPage() {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
               <p className="text-gray-600">Loading leaderboard...</p>
             </div>
-          ) : leaderboardData.length > 0 ? (
+          ) : leaderboardData.length > 0 ? ( // Adjusted condition
             <div className="space-y-4 mb-6">
               {leaderboardData.map((player, index) => (
                 <div
@@ -512,7 +541,13 @@ function RoomPage() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="grid grid-cols-3 gap-4 text-sm">
+                    <div className="grid grid-cols-4 gap-4 text-sm">
+                      <div>
+                        <div className="font-semibold text-green-600">
+                          {player.dailyPoints || 0}{" "}
+                        </div>
+                        <div className="text-gray-500">Points</div>
+                      </div>
                       <div>
                         <div className="font-semibold text-orange-600">
                           {player.bestSingle || "--:--"}
@@ -729,7 +764,7 @@ function RoomPage() {
     <div className="min-h-screen bg-gray-100">
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-800">
               Room: {roomCode}
@@ -745,7 +780,7 @@ function RoomPage() {
               onClick={() => setShowLeaderboardPopup(true)}
               className="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
             >
-              🏆 Leaderboard
+              🏆 Daily Leaderboard
             </button>
             <button
               onClick={handleBackToHome}
@@ -757,164 +792,244 @@ function RoomPage() {
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        {/* Instructions */}
-        {showInstructions && (
-          <div className="relative mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-            {/* Close button */}
-            <button
-              onClick={() => setShowInstructions(false)}
-              className="absolute top-2 right-2 text-blue-600 hover:text-blue-800 text-sm font-semibold"
-              aria-label="Close instructions"
-            >
-              ✕
-            </button>
+      {/* Main Content with Sidebar Layout */}
+      <div className="max-w-7xl mx-auto px-4 py-8 flex gap-6">
+        {/* Main Content Area */}
+        <div className="flex-1">
+          {/* Instructions */}
+          {showInstructions && (
+            <div className="relative mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+              {/* Close button */}
+              <button
+                onClick={() => setShowInstructions(false)}
+                className="absolute top-2 right-2 text-blue-600 hover:text-blue-800 text-sm font-semibold"
+                aria-label="Close instructions"
+              >
+                ✕
+              </button>
 
-            <h4 className="font-semibold text-blue-800 mb-2">How to Play:</h4>
-            <ul className="text-sm text-blue-700 space-y-1">
-              <li>
-                • Complete all 20 scrambles at your own pace within the day
-              </li>
-              <li>
-                • Click "Solve" to open the timer, hold SPACEBAR to prepare,
-                release to start
-              </li>
-              <li>• Press any key to stop the timer</li>
-              <li>
-                • Your solve times are automatically saved in your browser
-              </li>
-              <li>
-                • At the end of the day, your best AO5, AO12, and best solve
-                will be submitted
-              </li>
-              <li>
-                • Compete with others in your room for daily and weekly
-                rankings!
-              </li>
-            </ul>
+              <h4 className="font-semibold text-blue-800 mb-2">How to Play:</h4>
+              <ul className="text-sm text-blue-700 space-y-1">
+                <li>
+                  • Complete all 20 scrambles at your own pace within the day
+                </li>
+                <li>
+                  • Click "Solve" to open the timer, hold SPACEBAR to prepare,
+                  release to start
+                </li>
+                <li>• Press any key to stop the timer</li>
+                <li>
+                  • Your solve times are automatically saved in your browser
+                </li>
+                <li>
+                  • At the end of the day, your best AO5, AO12, and best solve
+                  will be submitted
+                </li>
+                <li>
+                  • Compete with others in your room for daily and weekly
+                  rankings!
+                </li>
+              </ul>
+            </div>
+          )}
+
+          {/* Completion Status */}
+          {completedSolves === 20 && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+              <div className="flex items-center">
+                <div className="text-green-600 text-2xl mr-3">🎉</div>
+                <div>
+                  <h4 className="font-semibold text-green-800">
+                    Congratulations! All solves completed!
+                  </h4>
+                  <p className="text-sm text-green-700">
+                    {statisticsSubmitted
+                      ? "Your statistics have been submitted successfully!"
+                      : "Submitting your statistics..."}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Room Info */}
+          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">
+              Today's Challenge
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+              <div className="text-center p-4 bg-green-50 rounded-lg">
+                <div className="text-2xl font-bold text-green-600">
+                  {completedSolves}/20
+                </div>
+                <div className="text-sm text-gray-600">Completed</div>
+              </div>
+              <div className="text-center p-4 bg-orange-50 rounded-lg">
+                <div className="text-2xl font-bold text-orange-600">
+                  {bestSingle || "--:--"}
+                </div>
+                <div className="text-sm text-gray-600">Best Single</div>
+              </div>
+              <div className="text-center p-4 bg-blue-50 rounded-lg">
+                <div className="text-2xl font-bold text-blue-600">
+                  {currentAO5 || "--:--"}
+                </div>
+                <div className="text-sm text-gray-600">Current AO5</div>
+              </div>
+              <div className="text-center p-4 bg-purple-50 rounded-lg">
+                <div className="text-2xl font-bold text-purple-600">
+                  {currentAO12 || "--:--"}
+                </div>
+                <div className="text-sm text-gray-600">Current AO12</div>
+              </div>
+              <div className="text-center p-4 bg-indigo-50 rounded-lg">
+                <div className="text-2xl font-bold text-indigo-600">
+                  {bestAO5 || "--:--"}
+                </div>
+                <div className="text-sm text-gray-600">Best AO5</div>
+              </div>
+              <div className="text-center p-4 bg-pink-50 rounded-lg">
+                <div className="text-2xl font-bold text-pink-600">
+                  {bestAO12 || "--:--"}
+                </div>
+                <div className="text-sm text-gray-600">Best AO12</div>
+              </div>
+            </div>
           </div>
-        )}
 
-        {/* Completion Status */}
-        {completedSolves === 20 && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-            <div className="flex items-center">
-              <div className="text-green-600 text-2xl mr-3">🎉</div>
-              <div>
-                <h4 className="font-semibold text-green-800">
-                  Congratulations! All solves completed!
-                </h4>
-                <p className="text-sm text-green-700">
-                  {statisticsSubmitted
-                    ? "Your statistics have been submitted successfully!"
-                    : "Submitting your statistics..."}
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
+          {/* Scrambles List */}
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">
+              Scrambles
+            </h3>
 
-        {/* Room Info */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4">
-            Today's Challenge
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
-            <div className="text-center p-4 bg-green-50 rounded-lg">
-              <div className="text-2xl font-bold text-green-600">
-                {completedSolves}/20
+            {scrambles.length > 0 ? (
+              <div className="space-y-4">
+                {scrambles.map((scramble, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex items-center space-x-4">
+                      <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-semibold">
+                        {index + 1}
+                      </div>
+                      <div className="font-mono text-sm text-gray-700 bg-gray-100 px-3 py-1 rounded">
+                        {scramble}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      {solveTimes[index] ? (
+                        <>
+                          <button
+                            onClick={() => handleDNF(index)}
+                            className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg font-medium transition-colors text-sm"
+                          >
+                            DNF
+                          </button>
+                          <div className="bg-gray-100 px-4 py-2 rounded-lg font-mono text-sm min-w-[80px] text-center">
+                            {solveTimes[index].time === "DNF"
+                              ? "DNF"
+                              : `${formatTime(solveTimes[index].time)}s`}
+                          </div>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => handleSolveClick(index)}
+                          className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+                        >
+                          Solve
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div className="text-sm text-gray-600">Completed</div>
-            </div>
-            <div className="text-center p-4 bg-orange-50 rounded-lg">
-              <div className="text-2xl font-bold text-orange-600">
-                {bestSingle || "--:--"}
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <div className="text-4xl mb-4">🎲</div>
+                <p>No scrambles available for this room.</p>
               </div>
-              <div className="text-sm text-gray-600">Best Single</div>
-            </div>
-            <div className="text-center p-4 bg-blue-50 rounded-lg">
-              <div className="text-2xl font-bold text-blue-600">
-                {currentAO5 || "--:--"}
-              </div>
-              <div className="text-sm text-gray-600">Current AO5</div>
-            </div>
-            <div className="text-center p-4 bg-purple-50 rounded-lg">
-              <div className="text-2xl font-bold text-purple-600">
-                {currentAO12 || "--:--"}
-              </div>
-              <div className="text-sm text-gray-600">Current AO12</div>
-            </div>
-            <div className="text-center p-4 bg-indigo-50 rounded-lg">
-              <div className="text-2xl font-bold text-indigo-600">
-                {bestAO5 || "--:--"}
-              </div>
-              <div className="text-sm text-gray-600">Best AO5</div>
-            </div>
-            <div className="text-center p-4 bg-pink-50 rounded-lg">
-              <div className="text-2xl font-bold text-pink-600">
-                {bestAO12 || "--:--"}
-              </div>
-              <div className="text-sm text-gray-600">Best AO12</div>
-            </div>
+            )}
           </div>
         </div>
 
-        {/* Scrambles List */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">
-            Scrambles
-          </h3>
+        {/* Weekly Leaderboard Sidebar */}
+        <div className="w-80 flex-shrink-0">
+          <div className="bg-white rounded-lg shadow-md p-6 sticky top-8">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-800">
+                Weekly Leaderboard
+              </h3>
+              <button
+                onClick={fetchWeeklyLeaderboard}
+                className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                disabled={isLoadingWeeklyLeaderboard}
+              >
+                {isLoadingWeeklyLeaderboard ? "..." : "🔄"}
+              </button>
+            </div>
 
-          {scrambles.length > 0 ? (
-            <div className="space-y-4">
-              {scrambles.map((scramble, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  <div className="flex items-center space-x-4">
-                    <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-semibold">
-                      {index + 1}
-                    </div>
-                    <div className="font-mono text-sm text-gray-700 bg-gray-100 px-3 py-1 rounded">
-                      {scramble}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    {solveTimes[index] ? (
-                      <>
-                        <button
-                          onClick={() => handleDNF(index)}
-                          className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg font-medium transition-colors text-sm"
-                        >
-                          DNF
-                        </button>
-                        <div className="bg-gray-100 px-4 py-2 rounded-lg font-mono text-sm min-w-[80px] text-center">
-                          {solveTimes[index].time === "DNF"
-                            ? "DNF"
-                            : `${formatTime(solveTimes[index].time)}s`}
-                        </div>
-                      </>
-                    ) : (
-                      <button
-                        onClick={() => handleSolveClick(index)}
-                        className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+            {isLoadingWeeklyLeaderboard ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500 mx-auto mb-2"></div>
+                <p className="text-gray-600 text-sm">Loading...</p>
+              </div>
+            ) : weeklyLeaderboardData.length > 0 ? (
+              <div className="space-y-3">
+                {weeklyLeaderboardData.map((player, index) => (
+                  <div
+                    key={`${player.roomCode}-${player.playerName}`}
+                    className={`flex items-center justify-between p-3 rounded-lg border ${
+                      index === 0
+                        ? "bg-yellow-50 border-yellow-200"
+                        : index === 1
+                        ? "bg-gray-50 border-gray-200"
+                        : index === 2
+                        ? "bg-orange-50 border-orange-200"
+                        : "bg-white border-gray-200"
+                    }`}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div
+                        className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                          index === 0
+                            ? "bg-yellow-500 text-white"
+                            : index === 1
+                            ? "bg-gray-500 text-white"
+                            : index === 2
+                            ? "bg-orange-500 text-white"
+                            : "bg-blue-100 text-blue-600"
+                        }`}
                       >
-                        Solve
-                      </button>
-                    )}
+                        {index + 1}
+                      </div>
+                      <div>
+                        <div className="font-semibold text-gray-800 text-sm">
+                          {player.playerName}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-bold text-green-600">
+                        {player.playerScore}
+                      </div>
+                      <div className="text-xs text-gray-500">points</div>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8 text-gray-500">
-              <div className="text-4xl mb-4">🎲</div>
-              <p>No scrambles available for this room.</p>
-            </div>
-          )}
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <div className="text-3xl mb-2">📊</div>
+                <p className="text-sm">No weekly rankings yet</p>
+                <p className="text-xs mt-1">
+                  Complete daily challenges to earn points!
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

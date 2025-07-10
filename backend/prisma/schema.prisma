@@ -39,6 +39,7 @@ model RoomStatistics {
   ao5         Float
   ao12        Float
   bestSolve   Float
+  dailyPoints  Int      @default(0)
 
   @@id([roomCode, playerName, date])
 }

@@ -149,4 +149,18 @@ export const getWeeklyLeaderboard = async (roomCode) => {
   }
 };
 
+// Get weekly best stats data
+export const getWeeklyBestStats = async (roomCode, weekStart = null) => {
+  try {
+    const url = weekStart
+      ? `/leaderboard/weekly-best-stats/${roomCode}?weekStart=${weekStart}`
+      : `/leaderboard/weekly-best-stats/${roomCode}`;
+
+    const response = await api.get(url);
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
 export default api;

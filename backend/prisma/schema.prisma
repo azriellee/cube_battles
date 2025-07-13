@@ -44,10 +44,25 @@ model RoomStatistics {
   @@id([roomCode, playerName, date])
 }
 
-model RoomLeaderboard {
-  roomCode    String
-  playerName  String
-  playerScore Int
+model WeeklyLeaderboard {
+  roomCode     String
+  playerName   String
+  weekStart    DateTime
+  weeklyPoints Int      @default(0)
 
-  @@id([roomCode, playerName])
+  @@id([roomCode, playerName, weekStart])
+}
+
+// These represent the BEST times achieved by ANY player in the room during the week
+model WeeklyBestStats {
+  roomCode            String
+  weekStart           DateTime 
+  bestAo5             Float?
+  bestAo5PlayerName   String?
+  bestAo12            Float?
+  bestAo12PlayerName  String?
+  bestSolve           Float?
+  bestSolvePlayerName String?
+
+  @@id([roomCode, weekStart])
 }

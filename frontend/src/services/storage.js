@@ -246,6 +246,21 @@ export const getWeeklyLeaderboardFromStorage = (roomCode) => {
   }
 };
 
+export const saveWeeklyBestStatsToStorage = (roomCode, bestStats) => {
+  localStorage.setItem(`weekly_best_stats_${roomCode}`, JSON.stringify(bestStats));
+};
+
+export const getWeeklyBestStatsFromStorage = (roomCode) => {
+  try {
+    const stored = localStorage.getItem(`weekly_best_stats_${roomCode}`);
+    if (!stored) return null;
+    return JSON.parse(stored);
+  } catch (error) {
+    console.error("Error getting weekly best stats from storage:", error);
+    return null;
+  }
+};
+
 // === ROOM DATA STORAGE ===
 
 // Username storage functions

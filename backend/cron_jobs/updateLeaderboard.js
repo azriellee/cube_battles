@@ -1,118 +1,171 @@
-// Install: npm install node-cron
-import cron from 'node-cron';
-import { PrismaClient } from '@prisma/client';
+import cron from "node-cron";
+import { PrismaClient } from "@prisma/client";
+import { getWeekStart, getPreviousDayDateRange } from "../routes/dateUtils.js";
 
 const prisma = new PrismaClient();
 
-// Function to calculate and update daily leaderboard and weekly leaderboard points
+// Daily cron job to do the following:
+// 1. Read the roomstatistics data and update the weekly leaderboard points
+// 2. Update weekly best stats table if there are changes to week's best ao5, ao12, bestSolve
 async function updateLeaderboardData() {
-  try {
-    console.log('Starting daily leaderboard update...');
-    
-    const now = new Date();
-    const yesterday = new Date(Date.UTC(
-      now.getUTCFullYear(),
-      now.getUTCMonth(),
-      now.getUTCDate() - 1,
-      0, 0, 0, 0
-    ));
-    
-    const endOfYesterday = new Date(Date.UTC(
-      now.getUTCFullYear(),
-      now.getUTCMonth(),
-      now.getUTCDate() - 1,
-      23, 59, 59, 999
-    ));
-    
-    const yesterdayStats = await prisma.roomStatistics.findMany({
+  console.log("Starting daily leaderboard update...");
+
+  const { startOfDay, endOfDay } = getPreviousDayDateRange();
+
+  const yesterdayStats = await prisma.roomStatistics.findMany({
+    where: {
+      date: {
+        gte: startOfDay,
+        lt: endOfDay,
+      },
+    },
+  });
+
+  if (yesterdayStats.length === 0) {
+    console.log("No statistics found for startOfDay");
+    return;
+  }
+
+  const roomGroups = {};
+  yesterdayStats.forEach((stat) => {
+    if (!roomGroups[stat.roomCode]) {
+      roomGroups[stat.roomCode] = [];
+    }
+    roomGroups[stat.roomCode].push(stat);
+  });
+
+  const weekStart = getWeekStart(startOfDay);
+
+  for (const [roomCode, stats] of Object.entries(roomGroups)) {
+    console.log(`Processing room: ${roomCode}`);
+
+    // Daily competition logic
+    const bestSolveWinner = stats.reduce((best, curr) =>
+      curr.bestSolve < best.bestSolve ? curr : best
+    );
+    const bestAo5Winner = stats.reduce((best, curr) =>
+      curr.ao5 < best.ao5 ? curr : best
+    );
+    const bestAo12Winner = stats.reduce((best, curr) =>
+      curr.ao12 < best.ao12 ? curr : best
+    );
+
+    const pointsToAward = {};
+    pointsToAward[bestSolveWinner.playerName] =
+      (pointsToAward[bestSolveWinner.playerName] || 0) + 4;
+    pointsToAward[bestAo5Winner.playerName] =
+      (pointsToAward[bestAo5Winner.playerName] || 0) + 3;
+    pointsToAward[bestAo12Winner.playerName] =
+      (pointsToAward[bestAo12Winner.playerName] || 0) + 3;
+
+    // Update weekly leaderboard
+    for (const [playerName, points] of Object.entries(pointsToAward)) {
+      await prisma.weeklyLeaderboard.upsert({
+        where: {
+          roomCode_playerName_weekStart: { roomCode, playerName, weekStart },
+        },
+        update: {
+          weeklyPoints: {
+            increment: points,
+          },
+        },
+        create: {
+          roomCode,
+          playerName,
+          weekStart,
+          weeklyPoints: points,
+        },
+      });
+
+      await prisma.roomStatistics.updateMany({
+        where: {
+          roomCode,
+          playerName,
+          date: {
+            gte: startOfDay,
+            lt: endOfDay,
+          },
+        },
+        data: {
+          dailyPoints: points,
+        },
+      });
+
+      console.log(
+        `Awarded ${points} points to ${playerName} in room ${roomCode}`
+      );
+    }
+
+    // Update weekly best stats using the already calculated winners
+    // Get current weekly records first
+    const currentWeeklyBest = await prisma.weeklyBestStats.findUnique({
       where: {
-        date: {
-          gte: yesterday,
-          lte: endOfYesterday
-        }
-      }
-    });
-    
-    if (yesterdayStats.length === 0) {
-      console.log('No statistics found for yesterday');
-      return;
-    }
-
-    const roomGroups = {};
-    yesterdayStats.forEach(stat => {
-      if (!roomGroups[stat.roomCode]) {
-        roomGroups[stat.roomCode] = [];
-      }
-      roomGroups[stat.roomCode].push(stat);
-      console.log(`Grouped stat for room ${stat.roomCode}:`, stat);
+        roomCode_weekStart: { roomCode, weekStart },
+      },
     });
 
-    for (const [roomCode, stats] of Object.entries(roomGroups)) {
-      console.log(`Processing room: ${roomCode}`);
+    // Prepare updates only if endOfDay's records are better (reuse the winners we already found)
+    const weeklyUpdates = {};
 
-      const bestSolveWinner = stats.reduce((best, curr) =>
-        curr.bestSolve < best.bestSolve ? curr : best
-      );
-
-      const bestAo5Winner = stats.reduce((best, curr) =>
-        curr.ao5 < best.ao5 ? curr : best
-      );
-
-      const bestAo12Winner = stats.reduce((best, curr) =>
-        curr.ao12 < best.ao12 ? curr : best
-      );
-
-      const pointsToAward = {};
-
-      pointsToAward[bestSolveWinner.playerName] = (pointsToAward[bestSolveWinner.playerName] || 0) + 4;
-      pointsToAward[bestAo5Winner.playerName] = (pointsToAward[bestAo5Winner.playerName] || 0) + 3;
-      pointsToAward[bestAo12Winner.playerName] = (pointsToAward[bestAo12Winner.playerName] || 0) + 3;
-
-      for (const [playerName, points] of Object.entries(pointsToAward)) {
-        await prisma.roomLeaderboard.upsert({
-          where: {
-            roomCode_playerName: { roomCode, playerName }
-          },
-          update: {
-            playerScore: {
-              increment: points
-            }
-          },
-          create: {
-            roomCode,
-            playerName,
-            playerScore: points
-          }
-        });
-
-        await prisma.roomStatistics.updateMany({
-          where: {
-            roomCode,
-            playerName,
-            date: {
-              gte: yesterday,
-              lte: endOfYesterday
-            }
-          },
-          data: {
-            dailyPoints: points
-          }
-        });
-
-        console.log(`Awarded ${points} points to ${playerName} in room ${roomCode}`);
-      }
+    if (
+      !currentWeeklyBest ||
+      !currentWeeklyBest.bestAo5 ||
+      bestAo5Winner.ao5 < currentWeeklyBest.bestAo5
+    ) {
+      weeklyUpdates.bestAo5 = bestAo5Winner.ao5;
+      weeklyUpdates.bestAo5PlayerName = bestAo5Winner.playerName;
     }
 
-    console.log('✅ Daily leaderboard update completed successfully');
-  } catch (error) {
-    console.error('❌ Error updating daily leaderboard:', error);
+    if (
+      !currentWeeklyBest ||
+      !currentWeeklyBest.bestAo12 ||
+      bestAo12Winner.ao12 < currentWeeklyBest.bestAo12
+    ) {
+      weeklyUpdates.bestAo12 = bestAo12Winner.ao12;
+      weeklyUpdates.bestAo12PlayerName = bestAo12Winner.playerName;
+    }
+
+    if (
+      !currentWeeklyBest ||
+      !currentWeeklyBest.bestSolve ||
+      bestSolveWinner.bestSolve < currentWeeklyBest.bestSolve
+    ) {
+      weeklyUpdates.bestSolve = bestSolveWinner.bestSolve;
+      weeklyUpdates.bestSolvePlayerName = bestSolveWinner.playerName;
+    }
+
+    // Update weekly records if we have any improvements
+    if (Object.keys(weeklyUpdates).length > 0) {
+      await prisma.weeklyBestStats.upsert({
+        where: {
+          roomCode_weekStart: { roomCode, weekStart },
+        },
+        update: weeklyUpdates,
+        create: {
+          roomCode,
+          weekStart,
+          bestAo5: bestAo5Winner.ao5,
+          bestAo5PlayerName: bestAo5Winner.playerName,
+          bestAo12: bestAo12Winner.ao12,
+          bestAo12PlayerName: bestAo12Winner.playerName,
+          bestSolve: bestSolveWinner.bestSolve,
+          bestSolvePlayerName: bestSolveWinner.playerName,
+        },
+      });
+
+      console.log(
+        `Updated weekly records for room ${roomCode}:`,
+        weeklyUpdates
+      );
+    }
   }
 }
 
-cron.schedule('1 0 * * *', updateLeaderboardData, {
-  timezone: 'UTC'
-});
+// weekly cron job for pruning of data, i think i can prune everything before the previous week
 
-console.log('Daily leaderboard cron job scheduled for 00:01 UTC');
+// daily leaderboard updating to run everyday at 12:01am UTC
+cron.schedule("1 0 * * *", updateLeaderboardData, {
+  timezone: "UTC",
+});
 
 export { updateLeaderboardData };

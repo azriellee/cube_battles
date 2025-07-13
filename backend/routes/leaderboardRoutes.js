@@ -4,27 +4,10 @@
 import express from "express";
 import { updateLeaderboardData } from "../cron_jobs/updateLeaderboard.js";
 import { PrismaClient } from "@prisma/client";
+import { getWeekStart, getPreviousDayDateRange } from "./dateUtils.js";
 
 const prisma = new PrismaClient();
 const router = express.Router();
-
-const getPreviousDayDateRange = () => {
-  const now = new Date();
-  const startOfDay = new Date(
-    Date.UTC(
-      now.getUTCFullYear(),
-      now.getUTCMonth(),
-      now.getUTCDate() - 1,
-      0,
-      0,
-      0
-    )
-  );
-  const endOfDay = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0)
-  );
-  return { startOfDay, endOfDay };
-};
 
 // Manual trigger endpoint (protected route recommended)
 router.post("/update-leaderboard", async (req, res) => {
@@ -48,15 +31,34 @@ router.get("/weekly-leaderboard/:roomCode", async (req, res) => {
   try {
     const { roomCode } = req.params;
 
-    const leaderboard = await prisma.roomLeaderboard.findMany({
-      where: { roomCode },
-      orderBy: { playerScore: "desc" },
+    const leaderboard = await prisma.weeklyLeaderboard.findMany({
+      where: {
+        roomCode: roomCode,
+      },
+      orderBy: [{ weeklyPoints: "desc" }, { weekStart: "desc" }],
     });
 
     res.json(leaderboard);
   } catch (error) {
     console.error("Error fetching leaderboard:", error);
     res.status(500).json({ error: "Failed to fetch leaderboard" });
+  }
+});
+
+// GET /weekly-best-stats/:roomCode?weekStart=YYYY-MM-DD
+router.get("/weekly-best-stats/:roomCode", async (req, res) => {
+  try {
+    const { roomCode } = req.params;
+
+    const bestStats = await prisma.weeklyBestStats.findMany({
+      where: { roomCode },
+      orderBy: { weekStart: "desc" },
+    });
+
+    res.json(bestStats);
+  } catch (error) {
+    console.error("Error fetching best stats:", error);
+    res.status(500).json({ error: "Failed to fetch best stats" });
   }
 });
 
@@ -86,9 +88,7 @@ router.get("/daily-leaderboard/:roomCode", async (req, res) => {
           lt: endOfDay,
         },
       },
-      orderBy: [
-        { dailyPoints: "desc" },
-      ],
+      orderBy: [{ dailyPoints: "desc" }],
     });
 
     // Format the leaderboard data

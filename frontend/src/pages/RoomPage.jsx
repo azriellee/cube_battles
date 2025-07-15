@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   getRoomScrambles,
@@ -13,7 +13,7 @@ import {
   getUsernameFromStorage,
   saveScramblesToStorage,
   getScramblesFromStorage,
-  saveSolveTime,
+  saveSolveTimesToStorage,
   getSolveTimes,
   saveBestAverageToStorage,
   getBestAverageFromStorage,
@@ -29,10 +29,7 @@ import {
   calculateAverage,
   getBestSingle,
 } from "../services/metrics";
-import {
-  getPreviousDayDateRange,
-  getWeekStart
-} from "../services/dateUtils";
+import { getPreviousDayDateRange, getWeekStart } from "../services/dateUtils";
 
 function RoomPage() {
   const { roomCode } = useParams();
@@ -61,7 +58,8 @@ function RoomPage() {
   const [isLoadingWeeklyLeaderboard, setIsLoadingWeeklyLeaderboard] =
     useState(false);
   const [weeklyBestStats, setWeeklyBestStats] = useState(null);
-  const [isLoadingWeeklyBestStats, setIsLoadingWeeklyBestStats] = useState(false);
+  const [isLoadingWeeklyBestStats, setIsLoadingWeeklyBestStats] =
+    useState(false);
   const [allWeeklyLeaderboardData, setAllWeeklyLeaderboardData] = useState([]);
   const [allWeeklyBestStats, setAllWeeklyBestStats] = useState([]);
   const [showWeeklyHistory, setShowWeeklyHistory] = useState(false);
@@ -130,11 +128,12 @@ function RoomPage() {
     try {
       const response = await getWeeklyLeaderboard(roomCode);
       setAllWeeklyLeaderboardData(response || []);
-      
+
       // Filter for current week
       const currentWeekStart = getWeekStart(new Date());
       const currentWeekData = (response || []).filter(
-        item => new Date(item.weekStart).getTime() === currentWeekStart.getTime()
+        (item) =>
+          new Date(item.weekStart).getTime() === currentWeekStart.getTime()
       );
       setWeeklyLeaderboardData(currentWeekData);
 
@@ -147,11 +146,12 @@ function RoomPage() {
       const storedLeaderboard = getWeeklyLeaderboardFromStorage(roomCode);
       if (storedLeaderboard !== null && storedLeaderboard !== undefined) {
         setAllWeeklyLeaderboardData(storedLeaderboard);
-        
+
         // Filter for current week
         const currentWeekStart = getWeekStart(new Date());
         const currentWeekData = storedLeaderboard.filter(
-          item => new Date(item.weekStart).getTime() === currentWeekStart.getTime()
+          (item) =>
+            new Date(item.weekStart).getTime() === currentWeekStart.getTime()
         );
         setWeeklyLeaderboardData(currentWeekData);
       }
@@ -167,11 +167,12 @@ function RoomPage() {
     try {
       const response = await getWeeklyBestStats(roomCode);
       setAllWeeklyBestStats(response || []);
-      
+
       // Filter for current week
       const currentWeekStart = getWeekStart(new Date());
       const currentWeekStats = (response || []).find(
-        item => new Date(item.weekStart).getTime() === currentWeekStart.getTime()
+        (item) =>
+          new Date(item.weekStart).getTime() === currentWeekStart.getTime()
       );
       setWeeklyBestStats(currentWeekStats || null);
 
@@ -184,11 +185,12 @@ function RoomPage() {
       const storedStats = getWeeklyBestStatsFromStorage(roomCode);
       if (storedStats !== null && storedStats !== undefined) {
         setAllWeeklyBestStats(storedStats);
-        
+
         // Filter for current week
         const currentWeekStart = getWeekStart(new Date());
         const currentWeekStats = storedStats.find(
-          item => new Date(item.weekStart).getTime() === currentWeekStart.getTime()
+          (item) =>
+            new Date(item.weekStart).getTime() === currentWeekStart.getTime()
         );
         setWeeklyBestStats(currentWeekStats || null);
       }
@@ -200,35 +202,38 @@ function RoomPage() {
   const generateWeeklyHistory = () => {
     // Get all unique weeks from both datasets
     const allWeeks = new Set();
-    
-    allWeeklyLeaderboardData.forEach(item => {
+
+    allWeeklyLeaderboardData.forEach((item) => {
       allWeeks.add(item.weekStart);
     });
-    
-    allWeeklyBestStats.forEach(item => {
+
+    allWeeklyBestStats.forEach((item) => {
       allWeeks.add(item.weekStart);
     });
 
     // Convert to sorted array (most recent first)
-    const sortedWeeks = Array.from(allWeeks).sort((a, b) => new Date(b) - new Date(a));
-    
+    const sortedWeeks = Array.from(allWeeks).sort(
+      (a, b) => new Date(b) - new Date(a)
+    );
+
     // Filter out current week for history
     const currentWeekStart = getWeekStart(new Date());
     const historicalWeeks = sortedWeeks.filter(
-      weekStart => new Date(weekStart).getTime() !== currentWeekStart.getTime()
+      (weekStart) =>
+        new Date(weekStart).getTime() !== currentWeekStart.getTime()
     );
 
-    return historicalWeeks.map(weekStart => {
+    return historicalWeeks.map((weekStart) => {
       // Find winner for this week (highest weekly points)
-      const weekLeaderboard = allWeeklyLeaderboardData.filter(
-        item => item.weekStart === weekStart
-      ).sort((a, b) => b.weeklyPoints - a.weeklyPoints);
-      
+      const weekLeaderboard = allWeeklyLeaderboardData
+        .filter((item) => item.weekStart === weekStart)
+        .sort((a, b) => b.weeklyPoints - a.weeklyPoints);
+
       const winner = weekLeaderboard[0] || null;
-      
+
       // Find best stats for this week
       const weekBestStats = allWeeklyBestStats.find(
-        item => item.weekStart === weekStart
+        (item) => item.weekStart === weekStart
       );
 
       return {
@@ -247,7 +252,7 @@ function RoomPage() {
   const handleShowWeeklyHistory = () => {
     setShowWeeklyHistory(true);
   };
-  
+
   useEffect(() => {
     if (roomCode) {
       const storedUsername = getUsernameFromStorage(roomCode);
@@ -351,6 +356,58 @@ function RoomPage() {
     }
   };
 
+  // Function to recompute best averages from first solve onwards when DNF
+  const recomputeBestAverages = (solveTimes) => {
+    let curBestAo5 = null;
+    let curBestAo12 = null;
+
+    const orderedKeys = Object.keys(solveTimes)
+      .map(Number)
+      .sort((a, b) => a - b);
+
+    // Calculate all possible AO5s
+    for (let i = 0; i <= orderedKeys.length - 5; i++) {
+      const windowKeys = orderedKeys.slice(i, i + 5);
+      const windowObject = {};
+      for (let key of windowKeys) {
+        windowObject[key] = solveTimes[key];
+      }
+
+      const ao5 = calculateAverage(windowObject, 5);
+      if (
+        ao5 &&
+        ao5 !== "DNF" &&
+        (!curBestAo5 || parseFloat(ao5) < parseFloat(curBestAo5))
+      ) {
+        curBestAo5 = ao5;
+      }
+    }
+
+    setBestAO5(curBestAo5);
+    saveBestAverageToStorage(roomCode, "ao5", curBestAo5);
+
+    // Calculate all possible AO12s
+    for (let i = 0; i <= orderedKeys.length - 12; i++) {
+      const windowKeys = orderedKeys.slice(i, i + 12);
+      const windowObject = {};
+      for (let key of windowKeys) {
+        windowObject[key] = solveTimes[key];
+      }
+
+      const ao12 = calculateAverage(windowObject, 12);
+      if (
+        ao12 &&
+        ao12 !== "DNF" &&
+        (!curBestAo12 || parseFloat(ao12) < parseFloat(curBestAo12))
+      ) {
+        curBestAo12 = ao12;
+      }
+    }
+
+    setBestAO12(curBestAo12);
+    saveBestAverageToStorage(roomCode, "ao12", curBestAo12);
+  };
+
   const fetchScrambles = async () => {
     setIsLoading(true);
     setError("");
@@ -388,14 +445,6 @@ function RoomPage() {
     const finalTime = currentTimeRef.current.toFixed(2);
     setIsTimerActive(false);
 
-    // Save the solve time
-    saveSolveTime(
-      roomCode,
-      activeScramble,
-      finalTime,
-      scrambles[activeScramble]
-    );
-
     // Update local state
     const newSolveTimes = {
       ...solveTimes,
@@ -405,8 +454,9 @@ function RoomPage() {
         timestamp: Date.now(),
       },
     };
-    setSolveTimes(newSolveTimes);
 
+    setSolveTimes(newSolveTimes);
+    saveSolveTimesToStorage(roomCode, newSolveTimes);
     // Update best averages
     updateBestAverages(newSolveTimes);
 
@@ -508,19 +558,18 @@ function RoomPage() {
   };
 
   const handleDNF = (index) => {
-    saveSolveTime(roomCode, index, "DNF", scrambles[index]);
     const newSolveTimes = {
       ...solveTimes,
       [index]: {
         time: "DNF",
         scramble: scrambles[index],
-        timestamp: Date.now(),
+        timestamp: solveTimes[index].timestamp,
       },
     };
     setSolveTimes(newSolveTimes);
-
-    // Update best averages
-    updateBestAverages(newSolveTimes);
+    saveSolveTimesToStorage(roomCode, newSolveTimes);
+    // Recompute best averages
+    recomputeBestAverages(newSolveTimes);
 
     // Check if all solves are completed and submit statistics
     checkAndSubmitStatistics(newSolveTimes);
@@ -597,11 +646,19 @@ function RoomPage() {
   };
 
   // Calculate statistics
-  const completedSolves = Object.keys(solveTimes).length;
-  const currentAO5 = calculateAverage(solveTimes, 5);
-  const currentAO12 = calculateAverage(solveTimes, 12);
-  const bestSingle = getBestSingle(solveTimes);
-
+  const completedSolves = useMemo(
+    () => Object.keys(solveTimes).length,
+    [solveTimes]
+  );
+  const currentAO5 = useMemo(
+    () => calculateAverage(solveTimes, 5),
+    [solveTimes]
+  );
+  const currentAO12 = useMemo(
+    () => calculateAverage(solveTimes, 12),
+    [solveTimes]
+  );
+  const bestSingle = useMemo(() => getBestSingle(solveTimes), [solveTimes]);
   // Daily Leaderboard popup modal
   if (showLeaderboardPopup) {
     return (
@@ -1093,22 +1150,29 @@ function RoomPage() {
                   fetchWeeklyBestStats();
                 }}
                 className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                disabled={isLoadingWeeklyLeaderboard || isLoadingWeeklyBestStats}
+                disabled={
+                  isLoadingWeeklyLeaderboard || isLoadingWeeklyBestStats
+                }
               >
-                {isLoadingWeeklyLeaderboard || isLoadingWeeklyBestStats ? "..." : "🔄"}
+                {isLoadingWeeklyLeaderboard || isLoadingWeeklyBestStats
+                  ? "..."
+                  : "🔄"}
               </button>
             </div>
 
             {/* Weekly Best Stats */}
             {weeklyBestStats && (
               <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                <h4 className="font-semibold text-gray-700 mb-3 text-sm">This Week's Best</h4>
+                <h4 className="font-semibold text-gray-700 mb-3 text-sm">
+                  This Week's Best
+                </h4>
                 <div className="space-y-2 text-sm">
                   {weeklyBestStats.bestAo5 && (
                     <div className="flex justify-between">
                       <span className="text-gray-600">Best AO5:</span>
                       <span className="font-mono text-blue-600">
-                        {formatTime(weeklyBestStats.bestAo5)}s ({weeklyBestStats.bestAo5PlayerName})
+                        {formatTime(weeklyBestStats.bestAo5)}s (
+                        {weeklyBestStats.bestAo5PlayerName})
                       </span>
                     </div>
                   )}
@@ -1116,7 +1180,8 @@ function RoomPage() {
                     <div className="flex justify-between">
                       <span className="text-gray-600">Best AO12:</span>
                       <span className="font-mono text-purple-600">
-                        {formatTime(weeklyBestStats.bestAo12)}s ({weeklyBestStats.bestAo12PlayerName})
+                        {formatTime(weeklyBestStats.bestAo12)}s (
+                        {weeklyBestStats.bestAo12PlayerName})
                       </span>
                     </div>
                   )}
@@ -1124,7 +1189,8 @@ function RoomPage() {
                     <div className="flex justify-between">
                       <span className="text-gray-600">Best Solve:</span>
                       <span className="font-mono text-green-600">
-                        {formatTime(weeklyBestStats.bestSolve)}s ({weeklyBestStats.bestSolvePlayerName})
+                        {formatTime(weeklyBestStats.bestSolve)}s (
+                        {weeklyBestStats.bestSolvePlayerName})
                       </span>
                     </div>
                   )}
@@ -1199,7 +1265,9 @@ function RoomPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-semibold text-gray-800">Weekly History</h3>
+              <h3 className="text-xl font-semibold text-gray-800">
+                Weekly History
+              </h3>
               <button
                 onClick={() => setShowWeeklyHistory(false)}
                 className="text-gray-500 hover:text-gray-700 text-xl font-bold"
@@ -1213,11 +1281,21 @@ function RoomPage() {
                 <table className="w-full border-collapse border border-gray-200">
                   <thead>
                     <tr className="bg-gray-50">
-                      <th className="border border-gray-200 px-4 py-2 text-left">Week Start</th>
-                      <th className="border border-gray-200 px-4 py-2 text-left">Winner</th>
-                      <th className="border border-gray-200 px-4 py-2 text-left">Best AO5</th>
-                      <th className="border border-gray-200 px-4 py-2 text-left">Best AO12</th>
-                      <th className="border border-gray-200 px-4 py-2 text-left">Best Solve</th>
+                      <th className="border border-gray-200 px-4 py-2 text-left">
+                        Week Start
+                      </th>
+                      <th className="border border-gray-200 px-4 py-2 text-left">
+                        Winner
+                      </th>
+                      <th className="border border-gray-200 px-4 py-2 text-left">
+                        Best AO5
+                      </th>
+                      <th className="border border-gray-200 px-4 py-2 text-left">
+                        Best AO12
+                      </th>
+                      <th className="border border-gray-200 px-4 py-2 text-left">
+                        Best Solve
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1229,7 +1307,8 @@ function RoomPage() {
                         <td className="border border-gray-200 px-4 py-2">
                           {week.winner ? (
                             <span>
-                              {week.winner.playerName} ({week.winner.weeklyPoints} pts)
+                              {week.winner.playerName} (
+                              {week.winner.weeklyPoints} pts)
                             </span>
                           ) : (
                             "-"
@@ -1238,7 +1317,8 @@ function RoomPage() {
                         <td className="border border-gray-200 px-4 py-2">
                           {week.bestAo5 ? (
                             <span className="font-mono text-blue-600">
-                              {formatTime(week.bestAo5)}s ({week.bestAo5PlayerName})
+                              {formatTime(week.bestAo5)}s (
+                              {week.bestAo5PlayerName})
                             </span>
                           ) : (
                             "-"
@@ -1247,7 +1327,8 @@ function RoomPage() {
                         <td className="border border-gray-200 px-4 py-2">
                           {week.bestAo12 ? (
                             <span className="font-mono text-purple-600">
-                              {formatTime(week.bestAo12)}s ({week.bestAo12PlayerName})
+                              {formatTime(week.bestAo12)}s (
+                              {week.bestAo12PlayerName})
                             </span>
                           ) : (
                             "-"
@@ -1256,7 +1337,8 @@ function RoomPage() {
                         <td className="border border-gray-200 px-4 py-2">
                           {week.bestSolve ? (
                             <span className="font-mono text-green-600">
-                              {formatTime(week.bestSolve)}s ({week.bestSolvePlayerName})
+                              {formatTime(week.bestSolve)}s (
+                              {week.bestSolvePlayerName})
                             </span>
                           ) : (
                             "-"

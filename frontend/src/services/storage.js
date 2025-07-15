@@ -99,39 +99,18 @@ export const getScramblesFromStorage = (roomCode) => {
  * @param {string} scramble
  * @returns
  */
-export const saveSolveTime = (roomCode, scrambleIndex, time, scramble) => {
+export const saveSolveTimesToStorage = (roomCode, solveTimes) => {
   try {
     const key = createStorageKey(STORAGE_KEYS.SOLVE_TIMES, roomCode);
-    const stored = localStorage.getItem(key);
-
-    let solveData = {
+    const solveData = {
       roomCode,
       date: getTodayString(),
-      solves: {},
+      solves: solveTimes,
       timestamp: Date.now(),
     };
-
-    if (stored) {
-      const existingData = JSON.parse(stored);
-      if (existingData.date === getTodayString()) {
-        solveData = existingData;
-      }
-    }
-
-    solveData.solves[scrambleIndex] = {
-      time,
-      scramble,
-      timestamp: Date.now(),
-    };
-
     localStorage.setItem(key, JSON.stringify(solveData));
-    // console.log(
-    //   `Saved solve time ${time} for scramble ${scrambleIndex} in room ${roomCode}`
-    // );
-    return true;
   } catch (error) {
-    console.error("Error saving solve time:", error);
-    return false;
+    console.error("Error saving solve times:", error);
   }
 };
 

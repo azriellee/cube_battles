@@ -5,7 +5,7 @@ backend: nodejs + express
 future functions:
 1. live battles
 2. battles with bets, using erc20 tokens and metmask integration, can create a simple smart contract for this
+3. add button to un-DNF a DNF, +2 button?
 
 todo:
-1. weekly leaderboard using cron job, resetting weekly competition
-2. containerise + set up CICD pipeline
+1. cron job to prune database every 2 weeks? prune from room stats table, scrambles table and weekly best stats table

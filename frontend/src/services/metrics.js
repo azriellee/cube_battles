@@ -18,11 +18,9 @@ export const calculateAverage = (solveTimes, count) => {
     .slice(0, count) // Take the most recent 'count' solves
     .map((solve) => solve.time);
 
-  if (recentSolves.length < count) return null;
-
   // Count DNFs
   const dnfCount = recentSolves.filter((time) => time === "DNF").length;
-
+  console.log("Recent Solves:", recentSolves);
   // If more than 1 DNF, the average is DNF
   if (dnfCount > 1) return "DNF";
 
@@ -32,17 +30,17 @@ export const calculateAverage = (solveTimes, count) => {
     .map((time) => parseFloat(time))
     .filter((time) => !isNaN(time));
 
-  // Need at least (count - 1) valid times for a valid average
-  if (validTimes.length < count - 1) return "DNF";
-
   // Sort valid times
   const sortedTimes = [...validTimes].sort((a, b) => a - b);
 
-  // Remove best and worst from valid times
-  if (sortedTimes.length > 2) {
+  if (dnfCount === 0) { // if no DNFs, remove best and worst
     sortedTimes.shift(); // remove best
     sortedTimes.pop(); // remove worst
+  } else if (dnfCount === 1) { // if one DNF, remove only the best, dnf would be considered the worst time
+    sortedTimes.shift();
   }
+
+  if (sortedTimes.length !== count - 2) throw new Error("Calculation of average went wrong");
 
   // Calculate average
   const sum = sortedTimes.reduce((a, b) => a + b, 0);

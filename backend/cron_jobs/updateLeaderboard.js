@@ -37,29 +37,45 @@ async function updateLeaderboardData() {
   const weekStart = getWeekStart(startOfDay);
 
   for (const [roomCode, stats] of Object.entries(roomGroups)) {
-    console.log(`Processing room: ${roomCode}`);
-
-    // Daily competition logic
-    const bestSolveWinner = stats.reduce((best, curr) =>
-      curr.bestSolve < best.bestSolve ? curr : best
-    );
-    const bestAo5Winner = stats.reduce((best, curr) =>
-      curr.ao5 < best.ao5 ? curr : best
-    );
-    const bestAo12Winner = stats.reduce((best, curr) =>
-      curr.ao12 < best.ao12 ? curr : best
-    );
-
     const pointsToAward = {};
-    pointsToAward[bestSolveWinner.playerName] =
-      (pointsToAward[bestSolveWinner.playerName] || 0) + 4;
-    pointsToAward[bestAo5Winner.playerName] =
-      (pointsToAward[bestAo5Winner.playerName] || 0) + 3;
-    pointsToAward[bestAo12Winner.playerName] =
-      (pointsToAward[bestAo12Winner.playerName] || 0) + 3;
 
-    // Update weekly leaderboard
-    for (const [playerName, points] of Object.entries(pointsToAward)) {
+    // Filter out null stats
+    const validBestSolveStats = stats.filter((s) => s.bestSolve !== null);
+    const validAo5Stats = stats.filter((s) => s.ao5 !== null);
+    const validAo12Stats = stats.filter((s) => s.ao12 !== null);
+
+    let bestSolveWinner, bestAo5Winner, bestAo12Winner;
+
+    if (validBestSolveStats.length > 0) {
+      bestSolveWinner = validBestSolveStats.reduce((best, curr) =>
+        curr.bestSolve < best.bestSolve ? curr : best
+      );
+      pointsToAward[bestSolveWinner.playerName] =
+        (pointsToAward[bestSolveWinner.playerName] || 0) + 4;
+    }
+
+    if (validAo5Stats.length > 0) {
+      bestAo5Winner = validAo5Stats.reduce((best, curr) =>
+        curr.ao5 < best.ao5 ? curr : best
+      );
+      pointsToAward[bestAo5Winner.playerName] =
+        (pointsToAward[bestAo5Winner.playerName] || 0) + 3;
+    }
+
+    if (validAo12Stats.length > 0) {
+      bestAo12Winner = validAo12Stats.reduce((best, curr) =>
+        curr.ao12 < best.ao12 ? curr : best
+      );
+      pointsToAward[bestAo12Winner.playerName] =
+        (pointsToAward[bestAo12Winner.playerName] || 0) + 3;
+    }
+
+    // Award points and update stats
+    const playersInRoom = [...new Set(stats.map((s) => s.playerName))];
+
+    for (const playerName of playersInRoom) {
+      const points = pointsToAward[playerName] || 0;
+
       await prisma.weeklyLeaderboard.upsert({
         where: {
           roomCode_playerName_weekStart: { roomCode, playerName, weekStart },
@@ -91,50 +107,56 @@ async function updateLeaderboardData() {
         },
       });
 
-      console.log(
-        `Awarded ${points} points to ${playerName} in room ${roomCode}`
-      );
+      if (points > 0) {
+        console.log(
+          `Awarded ${points} points to ${playerName} in room ${roomCode}`
+        );
+      } else {
+        console.log(
+          `Inserted ${playerName} in weekly leaderboard with 0 points for room ${roomCode}`
+        );
+      }
     }
 
-    // Update weekly best stats using the already calculated winners
-    // Get current weekly records first
+    // Handle weekly bests only if valid winners exist
     const currentWeeklyBest = await prisma.weeklyBestStats.findUnique({
       where: {
         roomCode_weekStart: { roomCode, weekStart },
       },
     });
 
-    // Prepare updates only if endOfDay's records are better (reuse the winners we already found)
     const weeklyUpdates = {};
 
     if (
-      !currentWeeklyBest ||
-      !currentWeeklyBest.bestAo5 ||
-      bestAo5Winner.ao5 < currentWeeklyBest.bestAo5
+      bestAo5Winner &&
+      (!currentWeeklyBest ||
+        !currentWeeklyBest.bestAo5 ||
+        bestAo5Winner.ao5 < currentWeeklyBest.bestAo5)
     ) {
       weeklyUpdates.bestAo5 = bestAo5Winner.ao5;
       weeklyUpdates.bestAo5PlayerName = bestAo5Winner.playerName;
     }
 
     if (
-      !currentWeeklyBest ||
-      !currentWeeklyBest.bestAo12 ||
-      bestAo12Winner.ao12 < currentWeeklyBest.bestAo12
+      bestAo12Winner &&
+      (!currentWeeklyBest ||
+        !currentWeeklyBest.bestAo12 ||
+        bestAo12Winner.ao12 < currentWeeklyBest.bestAo12)
     ) {
       weeklyUpdates.bestAo12 = bestAo12Winner.ao12;
       weeklyUpdates.bestAo12PlayerName = bestAo12Winner.playerName;
     }
 
     if (
-      !currentWeeklyBest ||
-      !currentWeeklyBest.bestSolve ||
-      bestSolveWinner.bestSolve < currentWeeklyBest.bestSolve
+      bestSolveWinner &&
+      (!currentWeeklyBest ||
+        !currentWeeklyBest.bestSolve ||
+        bestSolveWinner.bestSolve < currentWeeklyBest.bestSolve)
     ) {
       weeklyUpdates.bestSolve = bestSolveWinner.bestSolve;
       weeklyUpdates.bestSolvePlayerName = bestSolveWinner.playerName;
     }
 
-    // Update weekly records if we have any improvements
     if (Object.keys(weeklyUpdates).length > 0) {
       await prisma.weeklyBestStats.upsert({
         where: {
@@ -144,12 +166,12 @@ async function updateLeaderboardData() {
         create: {
           roomCode,
           weekStart,
-          bestAo5: bestAo5Winner.ao5,
-          bestAo5PlayerName: bestAo5Winner.playerName,
-          bestAo12: bestAo12Winner.ao12,
-          bestAo12PlayerName: bestAo12Winner.playerName,
-          bestSolve: bestSolveWinner.bestSolve,
-          bestSolvePlayerName: bestSolveWinner.playerName,
+          bestAo5: bestAo5Winner?.ao5 ?? null,
+          bestAo5PlayerName: bestAo5Winner?.playerName ?? null,
+          bestAo12: bestAo12Winner?.ao12 ?? null,
+          bestAo12PlayerName: bestAo12Winner?.playerName ?? null,
+          bestSolve: bestSolveWinner?.bestSolve ?? null,
+          bestSolvePlayerName: bestSolveWinner?.playerName ?? null,
         },
       });
 

@@ -36,9 +36,9 @@ model RoomStatistics {
   roomCode    String
   playerName  String
   date        DateTime
-  ao5         Float
-  ao12        Float
-  bestSolve   Float
+  ao5         Float?
+  ao12        Float?
+  bestSolve   Float?
   dailyPoints  Int      @default(0)
 
   @@id([roomCode, playerName, date])

@@ -10,7 +10,7 @@ const prisma = new PrismaClient();
 const PORT = process.env.PORT || 8080;
 
 const allowedOrigins = [
-  "https://cube-battles.web.app/", // Your deployed frontend
+  "https://cube-battles.web.app", // Your deployed frontend
   "http://localhost:5173", // Optional: local dev environment
 ];
 

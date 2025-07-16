@@ -72,6 +72,9 @@ async function updateLeaderboardData() {
 
     // Award points and update stats
     const playersInRoom = [...new Set(stats.map((s) => s.playerName))];
+    console.log(
+      `Processing room ${roomCode} with players: ${playersInRoom.join(", ")}`
+    );
 
     for (const playerName of playersInRoom) {
       const points = pointsToAward[playerName] || 0;

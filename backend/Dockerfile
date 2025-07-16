@@ -10,6 +10,9 @@ RUN npm install
 # Copy rest of the app
 COPY . .
 
+# Run Prisma generate
+RUN npx prisma generate
+
 # Expose port 
 EXPOSE 8080
 

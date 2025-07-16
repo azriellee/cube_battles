@@ -9,8 +9,24 @@ const app = express();
 const prisma = new PrismaClient();
 const PORT = process.env.PORT || 8080;
 
+const allowedOrigins = [
+  "https://https://cube-battles.web.app/", // Your deployed frontend
+  "http://localhost:5173", // Optional: local dev environment
+];
+
 // Middleware
-app.use(cors());
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      // Allow requests with no origin (e.g. curl or mobile apps)
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+  })
+);
 app.use(express.json());
 
 // Routes

@@ -1,7 +1,7 @@
 // src/services/api.js
 import axios from "axios";
 
-const API_BASE_URL = "http://localhost:8080/api";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -62,7 +62,10 @@ export const joinRoom = async (roomCode) => {
 // Submit a username for the room
 export const submitUsername = async (roomCode, username) => {
   try {
-    const response = await api.post("/roomRoutes/submit-username", { roomCode, username });
+    const response = await api.post("/roomRoutes/submit-username", {
+      roomCode,
+      username,
+    });
     return { success: true, data: response }; // Note: response is already .data due to interceptor
   } catch (error) {
     if (error.response) {
@@ -132,7 +135,9 @@ export const sendPlayerStatistics = async (
 // Get daily leaderboard data
 export const getDailyLeaderboard = async (roomCode) => {
   try {
-    const response = await api.get(`/leaderboard/daily-leaderboard/${roomCode}`);
+    const response = await api.get(
+      `/leaderboard/daily-leaderboard/${roomCode}`
+    );
     return response;
   } catch (error) {
     throw error;
@@ -142,7 +147,9 @@ export const getDailyLeaderboard = async (roomCode) => {
 // Get weekly leaderboard data
 export const getWeeklyLeaderboard = async (roomCode) => {
   try {
-    const response = await api.get(`/leaderboard/weekly-leaderboard/${roomCode}`);
+    const response = await api.get(
+      `/leaderboard/weekly-leaderboard/${roomCode}`
+    );
     return response;
   } catch (error) {
     throw error;

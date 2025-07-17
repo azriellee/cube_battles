@@ -1,4 +1,4 @@
-import cron from "node-cron";
+// import cron from "node-cron";
 import { PrismaClient } from "@prisma/client";
 import { getWeekStart, getPreviousDayDateRange } from "../routes/dateUtils.js";
 
@@ -7,6 +7,7 @@ const prisma = new PrismaClient();
 // Daily cron job to do the following:
 // 1. Read the roomstatistics data and update the weekly leaderboard points
 // 2. Update weekly best stats table if there are changes to week's best ao5, ao12, bestSolve
+// UPDATE: exposed endpoint to manually trigger leaderboard update, scheduled using cloud scheduler on GCR
 async function updateLeaderboardData() {
   console.log("Starting daily leaderboard update...");
 
@@ -189,8 +190,8 @@ async function updateLeaderboardData() {
 // weekly cron job for pruning of data, i think i can prune everything before the previous week
 
 // daily leaderboard updating to run everyday at 12:01am UTC
-cron.schedule("1 0 * * *", updateLeaderboardData, {
-  timezone: "UTC",
-});
+// cron.schedule("1 0 * * *", updateLeaderboardData, {
+//   timezone: "UTC",
+// });
 
 export { updateLeaderboardData };

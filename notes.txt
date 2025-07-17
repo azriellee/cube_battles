@@ -3,9 +3,14 @@ frontend: react + vite
 backend: nodejs + express
 
 future functions:
-1. live battles
-2. battles with bets, using erc20 tokens and metmask integration, can create a simple smart contract for this
-3. add button to un-DNF a DNF, +2 button?
+1. Allow users to choose number of solves
+2. Live daily leaderboards
+3. Progressive Web Application
+3. live battles
+4. Implement User profiles, storing solve statistics for users
+5. battles with bets, using erc20 tokens and metamask integration
 
 todo:
-1. cron job to prune database every 2 weeks? prune from room stats table, scrambles table and weekly best stats table
+1. prune database every 2 weeks/ 1month? prune from room stats table, scrambles table and weekly best stats table. to see how much data 1 room of 3 people take
+2. include live leaderboard tracking for people's progress throughout the day
+3. Make it a PWA so that i can use on phone too

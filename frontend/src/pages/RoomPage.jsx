@@ -857,51 +857,82 @@ function RoomPage() {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
         <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-2xl mx-4 text-center">
-          <>
-            <div className="mb-6">
-              <h2 className="text-xl font-bold text-gray-800 mb-4">
-                Scramble {activeScramble + 1}
-              </h2>
-              <div className="font-mono text-lg text-gray-700 bg-gray-100 px-4 py-2 rounded mb-6">
-                {scrambles[activeScramble]}
+          {/* Stats bar */}
+          <div className="mb-8">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+              <div className="text-center bg-orange-100 rounded py-2">
+                <div className="text-sm font-bold text-orange-600">
+                  {bestSingle || "--:--"}
+                </div>
+                <div className="text-gray-600">Best</div>
               </div>
+              <div className="text-center bg-blue-100 rounded py-2">
+                <div className="text-sm font-bold text-blue-600">
+                  {currentAO5 || "--:--"}
+                </div>
+                <div className="text-gray-600">Current AO5</div>
+              </div>
+              <div className="text-center bg-purple-100 rounded py-2">
+                <div className="text-sm font-bold text-purple-600">
+                  {currentAO12 || "--:--"}
+                </div>
+                <div className="text-gray-600">Current AO12</div>
+              </div>
+              {/* <div className="text-center bg-indigo-100 rounded py-2">
+                <div className="text-sm font-bold text-indigo-600">
+                  {bestAO5 || "--:--"}
+                </div>
+                <div className="text-gray-600">Best AO5</div>
+              </div>
+              <div className="text-center bg-pink-100 rounded py-2">
+                <div className="text-sm font-bold text-pink-600">
+                  {bestAO12 || "--:--"}
+                </div>
+                <div className="text-gray-600">Best AO12</div>
+              </div> */}
             </div>
-
-            <div className="mb-8">
-              <div
-                className={`text-6xl font-mono font-bold mb-4 ${
-                  isTimerActive
-                    ? "text-green-600"
-                    : isHoldingSpace
-                    ? canStartTimer
-                      ? "text-green-500"
-                      : "text-red-500"
-                    : "text-gray-800"
-                }`}
-              >
-                {formatTime(currentTime.toFixed(2))}
-              </div>
-
-              <div className="text-gray-600 mb-4">
-                {!isTimerActive &&
-                  !isHoldingSpace &&
-                  "Hold SPACEBAR to prepare, release to start"}
-                {isHoldingSpace && !canStartTimer && "Keep holding..."}
-                {isHoldingSpace &&
-                  canStartTimer &&
-                  "Release SPACEBAR to start!"}
-                {isTimerActive && "Press ANY KEY to stop the timer"}
-              </div>
+          </div>
+          <div className="mb-6">
+            <h2 className="text-xl font-bold text-gray-800 mb-4">
+              Scramble {activeScramble + 1}
+            </h2>
+            <div className="font-mono text-lg text-gray-700 bg-gray-100 px-4 py-2 rounded mb-6">
+              {scrambles[activeScramble]}
             </div>
+          </div>
 
-            <button
-              onClick={() => setActiveScramble(null)}
-              className="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-6 rounded-lg"
-              disabled={isTimerActive}
+          <div className="mb-8">
+            <div
+              className={`text-7xl font-mono font-bold mb-4 ${
+                isTimerActive
+                  ? "text-green-600"
+                  : isHoldingSpace
+                  ? canStartTimer
+                    ? "text-green-500"
+                    : "text-red-500"
+                  : "text-gray-800"
+              }`}
             >
-              Cancel
-            </button>
-          </>
+              {formatTime(currentTime.toFixed(2))}
+            </div>
+
+            <div className="text-gray-600 mb-4">
+              {!isTimerActive &&
+                !isHoldingSpace &&
+                "Hold SPACEBAR to prepare, release to start"}
+              {isHoldingSpace && !canStartTimer && "Keep holding..."}
+              {isHoldingSpace && canStartTimer && "Release SPACEBAR to start!"}
+              {isTimerActive && "Press ANY KEY to stop the timer"}
+            </div>
+          </div>
+
+          <button
+            onClick={() => setActiveScramble(null)}
+            className="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-6 rounded-lg"
+            disabled={isTimerActive}
+          >
+            Cancel
+          </button>
         </div>
       </div>
     );

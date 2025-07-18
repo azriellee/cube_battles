@@ -88,7 +88,12 @@ router.get("/daily-leaderboard/:roomCode", async (req, res) => {
           lt: endOfDay,
         },
       },
-      orderBy: [{ dailyPoints: "desc" }],
+      orderBy: [
+        { dailyPoints: "desc" },
+        { bestSolve: "asc" },
+        { ao5: "asc" },
+        { ao12: "asc" },
+      ],
     });
 
     // Format the leaderboard data

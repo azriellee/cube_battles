@@ -312,20 +312,6 @@ function RoomPage() {
     }
   };
 
-  // Function to check if all solves are completed and submit statistics
-  const checkAndSubmitStatistics = (newSolveTimes) => {
-    const completedCount = Object.keys(newSolveTimes).length;
-    const totalScrambles = scrambles.length;
-
-    if (
-      completedCount === totalScrambles &&
-      totalScrambles === 20 &&
-      !statisticsSubmitted
-    ) {
-      submitStatistics(newSolveTimes);
-    }
-  };
-
   // Function to update best averages
   const updateBestAverages = (solveTimes) => {
     const currentAO5 = calculateAverage(solveTimes, 5);
@@ -460,9 +446,6 @@ function RoomPage() {
     // Update best averages
     updateBestAverages(newSolveTimes);
 
-    // Check if all solves are completed and submit statistics
-    checkAndSubmitStatistics(newSolveTimes);
-
     const nextScrambleIndex = activeScramble + 1;
 
     if (nextScrambleIndex < scrambles.length) {
@@ -570,9 +553,6 @@ function RoomPage() {
     saveSolveTimesToStorage(roomCode, newSolveTimes);
     // Recompute best averages
     recomputeBestAverages(newSolveTimes);
-
-    // Check if all solves are completed and submit statistics
-    checkAndSubmitStatistics(newSolveTimes);
   };
 
   const handleUsernameSubmit = async (e) => {
@@ -1047,18 +1027,18 @@ function RoomPage() {
           )}
 
           {/* Completion Status */}
-          {completedSolves === 20 && (
+          {statisticsSubmitted && (
             <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
               <div className="flex items-center">
                 <div className="text-green-600 text-2xl mr-3">🎉</div>
                 <div>
                   <h4 className="font-semibold text-green-800">
-                    Congratulations! All solves completed!
+                    {completedSolves === 20
+                      ? "Congratulations! All solves completed!"
+                      : "Submission received!"}
                   </h4>
                   <p className="text-sm text-green-700">
-                    {statisticsSubmitted
-                      ? "Your statistics have been submitted successfully!"
-                      : "Submitting your statistics..."}
+                    Your statistics have been submitted successfully!
                   </p>
                 </div>
               </div>
@@ -1166,6 +1146,25 @@ function RoomPage() {
               </div>
             )}
           </div>
+          <button
+            onClick={() => {
+              if (completedSolves !== 20) {
+                const confirmed = window.confirm(
+                  `You have only completed ${completedSolves} out of 20 solves.\nAre you sure you want to submit your results?`
+                );
+                if (!confirmed) return;
+              }
+              submitStatistics(solveTimes);
+            }}
+            className={`mt-6 w-full py-3 px-4 rounded-lg font-semibold text-white transition-colors ${
+              !statisticsSubmitted
+                ? "bg-blue-600 hover:bg-blue-700"
+                : "bg-gray-400 cursor-not-allowed"
+            }`}
+            disabled={statisticsSubmitted}
+          >
+            Submit Results
+          </button>
         </div>
 
         {/* Weekly Leaderboard Sidebar */}

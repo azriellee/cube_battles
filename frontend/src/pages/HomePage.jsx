@@ -58,11 +58,16 @@ function HomePage() {
     // <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-500 to-purple-600">
     <div className="min-h-screen flex items-center justify-center bg-blue-100">
       <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">
-            🎲 Cube Battles
+        <div className="text-center mb-12">
+          <img
+            src="/logo/logo.png"
+            alt="Speedcube Battles Logo"
+            className="mx-auto w-24 h-24 mb-4"
+          />
+          <h1 className="text-4xl font-bold text-gray-800 mb-2">
+            Cube Battles
           </h1>
-          <p className="text-gray-600">
+          <p className="text-gray-600 text-lg">
             Battle your friends in Rubik's cube solving!
           </p>
         </div>

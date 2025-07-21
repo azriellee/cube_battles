@@ -60,7 +60,7 @@ function HomePage() {
       <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
         <div className="text-center mb-12">
           <img
-            src="/logo/logo.png"
+            src="/logo.png"
             alt="Speedcube Battles Logo"
             className="mx-auto w-24 h-24 mb-4"
           />

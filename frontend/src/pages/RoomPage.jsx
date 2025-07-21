@@ -957,7 +957,7 @@ function RoomPage() {
           <div className="flex items-center space-x-4">
             {/* Logo */}
             <img
-              src="/logo/logo.png"
+              src="/logo.png"
               alt="Speedcube Battles Logo"
               className="w-12 h-12"
             />

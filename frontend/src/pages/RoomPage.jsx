@@ -47,6 +47,7 @@ function RoomPage() {
   const [bestAO5, setBestAO5] = useState(null);
   const [bestAO12, setBestAO12] = useState(null);
   const [statisticsSubmitted, setStatisticsSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Daily leaderboard states
   const [showLeaderboardPopup, setShowLeaderboardPopup] = useState(false);
@@ -284,7 +285,9 @@ function RoomPage() {
 
   // Function to submit statistics when all solves are complete
   const submitStatistics = async (solveTimes) => {
-    if (statisticsSubmitted) return; // Prevent duplicate submissions
+    if (statisticsSubmitted || isSubmitting) return; // prevent duplicate submissions
+
+    setIsSubmitting(true);
 
     try {
       const finalBestSingle = getBestSingle(solveTimes);
@@ -302,13 +305,11 @@ function RoomPage() {
 
       setStatisticsSubmitted(true);
       console.log("Statistics submitted successfully!");
-
-      // Optional: Show success message to user
-      // You could add a state for showing a success notification
     } catch (error) {
       console.error("Failed to submit statistics:", error);
-      // Optional: Show error message to user
-      // You could add error handling UI here
+      setIsSubmitting(false);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -1157,13 +1158,17 @@ function RoomPage() {
               submitStatistics(solveTimes);
             }}
             className={`mt-6 w-full py-3 px-4 rounded-lg font-semibold text-white transition-colors ${
-              !statisticsSubmitted
+              !statisticsSubmitted && !isSubmitting
                 ? "bg-blue-600 hover:bg-blue-700"
                 : "bg-gray-400 cursor-not-allowed"
             }`}
-            disabled={statisticsSubmitted}
+            disabled={statisticsSubmitted || isSubmitting}
           >
-            Submit Results
+            {isSubmitting
+              ? "Submitting..."
+              : statisticsSubmitted
+              ? "Results Submitted"
+              : "Submit Results"}
           </button>
         </div>
 

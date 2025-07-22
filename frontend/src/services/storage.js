@@ -7,6 +7,7 @@ const STORAGE_KEYS = {
   SCRAMBLES: "cube_battles_scrambles",
   SOLVE_TIMES: "cube_battles_solve_times",
   ROOM_DATA: "cube_battles_room_data",
+  RESULTS_SUBMITTED: "cube_battles_submitted",
 };
 
 // Get today's date as a string (YYYY-MM-DD)
@@ -17,7 +18,11 @@ const getTodayString = () => {
 // Get previous day's date as a string (YYYY-MM-DD)
 const getPreviousDayString = () => {
   const today = new Date();
-  const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
+  const startOfDay = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate() - 1
+  );
   return startOfDay.toISOString().split("T")[0];
 };
 
@@ -187,15 +192,20 @@ export const getBestAverageFromStorage = (roomCode, type) => {
 
 /* Leaderboard Storage Functions */
 
-export const saveDailyLeaderboardToStorage = (roomCode, dailyLeaderboardData) => {
-  localStorage.setItem(`daily_leaderboard_${roomCode}`, JSON.stringify(dailyLeaderboardData));
+export const saveDailyLeaderboardToStorage = (
+  roomCode,
+  dailyLeaderboardData
+) => {
+  localStorage.setItem(
+    `daily_leaderboard_${roomCode}`,
+    JSON.stringify(dailyLeaderboardData)
+  );
 };
-
 
 export const getDailyLeaderboardFromStorage = (roomCode) => {
   try {
     const stored = localStorage.getItem(`daily_leaderboard_${roomCode}`);
-    
+
     if (!stored) return null;
 
     const data = JSON.parse(stored);
@@ -210,13 +220,16 @@ export const getDailyLeaderboardFromStorage = (roomCode) => {
 };
 
 export const saveWeeklyLeaderboardToStorage = (roomCode, leaderboardData) => {
-  localStorage.setItem(`weekly_leaderboard_${roomCode}`, JSON.stringify(leaderboardData));
+  localStorage.setItem(
+    `weekly_leaderboard_${roomCode}`,
+    JSON.stringify(leaderboardData)
+  );
 };
 
 export const getWeeklyLeaderboardFromStorage = (roomCode) => {
   try {
     const stored = localStorage.getItem(`weekly_leaderboard_${roomCode}`);
-    if (!stored) return null; 
+    if (!stored) return null;
     const data = JSON.parse(stored);
     return data;
   } catch (error) {
@@ -226,7 +239,10 @@ export const getWeeklyLeaderboardFromStorage = (roomCode) => {
 };
 
 export const saveWeeklyBestStatsToStorage = (roomCode, bestStats) => {
-  localStorage.setItem(`weekly_best_stats_${roomCode}`, JSON.stringify(bestStats));
+  localStorage.setItem(
+    `weekly_best_stats_${roomCode}`,
+    JSON.stringify(bestStats)
+  );
 };
 
 export const getWeeklyBestStatsFromStorage = (roomCode) => {
@@ -241,6 +257,37 @@ export const getWeeklyBestStatsFromStorage = (roomCode) => {
 };
 
 // === ROOM DATA STORAGE ===
+
+// Helper function to get submission status from localStorage
+export const getSubmissionStatusFromStorage = (roomCode) => {
+  try {
+    const key = createStorageKey(STORAGE_KEYS.RESULTS_SUBMITTED, roomCode);
+    const saved = localStorage.getItem(key);
+
+    if (!saved) {
+      return false;
+    }
+
+    const savedDate = saved;
+    const todayDate = getTodayString();
+
+    return savedDate === todayDate;
+  } catch (error) {
+    console.error("Error loading submission status:", error);
+    return false;
+  }
+};
+
+// Helper function to save submission status to localStorage
+export const saveSubmissionStatusToStorage = (roomCode) => {
+  try {
+    const todayDate = getTodayString();
+    const key = createStorageKey(STORAGE_KEYS.RESULTS_SUBMITTED, roomCode);
+    localStorage.setItem(key, todayDate);
+  } catch (error) {
+    console.error("Error saving submission status:", error);
+  }
+};
 
 // Username storage functions
 export const saveUsernameToStorage = (roomCode, username) => {

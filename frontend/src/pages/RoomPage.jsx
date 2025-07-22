@@ -500,20 +500,17 @@ function RoomPage() {
     (event) => {
       if (activeScramble === null) return;
 
-      // Prevent scrolling and other touch behaviors
       event.preventDefault();
 
       if (!isTimerActive && !isHoldingSpace) {
         setIsHoldingSpace(true);
         setCanStartTimer(false);
 
-        // Start the hold timer
         const holdTimer = setTimeout(() => {
           setCanStartTimer(true);
           setCurrentTime(0);
         }, 300); // 300ms hold required
 
-        // Store the timer ID so we can clear it if needed
         event.currentTarget.holdTimer = holdTimer;
       }
     },
@@ -526,7 +523,6 @@ function RoomPage() {
 
       event.preventDefault();
 
-      // Clear the hold timer if it exists
       if (event.currentTarget.holdTimer) {
         clearTimeout(event.currentTarget.holdTimer);
         event.currentTarget.holdTimer = null;
@@ -536,9 +532,9 @@ function RoomPage() {
         setIsHoldingSpace(false);
 
         if (canStartTimer) {
-          // Start timer
           setIsTimerActive(true);
           setCurrentTime(0);
+          event.stopPropagation(); 
         }
       } else if (isTimerActive) {
         stopTimer();
@@ -605,6 +601,26 @@ function RoomPage() {
       document.removeEventListener("keyup", handleKeyUp);
     };
   }, [handleKeyDown, handleKeyUp]);
+
+  // Global mobile touch-to-stop effect
+  useEffect(() => {
+    function handleGlobalTouchEnd(event) {
+      if (isTimerActive) {
+        event.preventDefault();
+        stopTimer();
+      }
+    }
+
+    if (isTimerActive) {
+      document.addEventListener("touchend", handleGlobalTouchEnd, {
+        passive: false,
+      });
+    }
+
+    return () => {
+      document.removeEventListener("touchend", handleGlobalTouchEnd);
+    };
+  }, [isTimerActive, stopTimer]);
 
   const currentTimeRef = useRef(0);
   // Timer update effect

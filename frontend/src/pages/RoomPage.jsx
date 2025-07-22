@@ -23,6 +23,8 @@ import {
   getWeeklyLeaderboardFromStorage,
   saveWeeklyBestStatsToStorage,
   getWeeklyBestStatsFromStorage,
+  getSubmissionStatusFromStorage,
+  saveSubmissionStatusToStorage,
 } from "../services/storage";
 import {
   formatTime,
@@ -30,6 +32,7 @@ import {
   getBestSingle,
 } from "../services/metrics";
 import { getPreviousDayDateRange, getWeekStart } from "../services/dateUtils";
+import { useIsMobile } from "../services/hooks/useIsMobile";
 
 function RoomPage() {
   const { roomCode } = useParams();
@@ -46,8 +49,14 @@ function RoomPage() {
   const [showInstructions, setShowInstructions] = useState(true);
   const [bestAO5, setBestAO5] = useState(null);
   const [bestAO12, setBestAO12] = useState(null);
-  const [statisticsSubmitted, setStatisticsSubmitted] = useState(false);
+  const [statisticsSubmitted, setStatisticsSubmitted] = useState(() => {
+    if (roomCode) {
+      return getSubmissionStatusFromStorage(roomCode);
+    }
+    return false;
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showCompletionPopup, setShowCompletionPopup] = useState(false);
 
   // Daily leaderboard states
   const [showLeaderboardPopup, setShowLeaderboardPopup] = useState(false);
@@ -64,7 +73,6 @@ function RoomPage() {
   const [allWeeklyLeaderboardData, setAllWeeklyLeaderboardData] = useState([]);
   const [allWeeklyBestStats, setAllWeeklyBestStats] = useState([]);
   const [showWeeklyHistory, setShowWeeklyHistory] = useState(false);
-  // const [isLoadingWeeklyHistory, setIsLoadingWeeklyHistory] = useState(false);
 
   // Timer states
   const [activeScramble, setActiveScramble] = useState(null);
@@ -72,6 +80,25 @@ function RoomPage() {
   const [currentTime, setCurrentTime] = useState(0);
   const [isHoldingSpace, setIsHoldingSpace] = useState(false);
   const [canStartTimer, setCanStartTimer] = useState(false);
+
+  // Mobile specific states
+  const isMobile = useIsMobile();
+  const [showMobileLeaderboard, setShowMobileLeaderboard] = useState(false);
+
+  // Calculate statistics
+  const completedSolves = useMemo(
+    () => Object.keys(solveTimes).length,
+    [solveTimes]
+  );
+  const currentAO5 = useMemo(
+    () => calculateAverage(solveTimes, 5),
+    [solveTimes]
+  );
+  const currentAO12 = useMemo(
+    () => calculateAverage(solveTimes, 12),
+    [solveTimes]
+  );
+  const bestSingle = useMemo(() => getBestSingle(solveTimes), [solveTimes]);
 
   // Check if leaderboard should be shown (once per day)
   const shouldShowLeaderboard = () => {
@@ -304,6 +331,7 @@ function RoomPage() {
       );
 
       setStatisticsSubmitted(true);
+      saveSubmissionStatusToStorage(roomCode);
       console.log("Statistics submitted successfully!");
     } catch (error) {
       console.error("Failed to submit statistics:", error);
@@ -456,9 +484,68 @@ function RoomPage() {
       // If all scrambles are done, close the timer modal
       setActiveScramble(null);
     }
-    // setCurrentTime(0);
+
+    if (
+      completedSolves + 1 === 20 &&
+      !statisticsSubmitted &&
+      !showCompletionPopup
+    ) {
+      setShowCompletionPopup(true);
+    }
     currentTimeRef.current = 0;
   };
+
+  // Touch handlers for mobile devies
+  const handleTouchStart = useCallback(
+    (event) => {
+      if (activeScramble === null) return;
+
+      // Prevent scrolling and other touch behaviors
+      event.preventDefault();
+
+      if (!isTimerActive && !isHoldingSpace) {
+        setIsHoldingSpace(true);
+        setCanStartTimer(false);
+
+        // Start the hold timer
+        const holdTimer = setTimeout(() => {
+          setCanStartTimer(true);
+          setCurrentTime(0);
+        }, 300); // 300ms hold required
+
+        // Store the timer ID so we can clear it if needed
+        event.currentTarget.holdTimer = holdTimer;
+      }
+    },
+    [activeScramble, isTimerActive, isHoldingSpace]
+  );
+
+  const handleTouchEnd = useCallback(
+    (event) => {
+      if (activeScramble === null) return;
+
+      event.preventDefault();
+
+      // Clear the hold timer if it exists
+      if (event.currentTarget.holdTimer) {
+        clearTimeout(event.currentTarget.holdTimer);
+        event.currentTarget.holdTimer = null;
+      }
+
+      if (isHoldingSpace && !isTimerActive) {
+        setIsHoldingSpace(false);
+
+        if (canStartTimer) {
+          // Start timer
+          setIsTimerActive(true);
+          setCurrentTime(0);
+        }
+      } else if (isTimerActive) {
+        stopTimer();
+      }
+    },
+    [activeScramble, isHoldingSpace, isTimerActive, canStartTimer]
+  );
 
   const handleKeyDown = useCallback(
     (event) => {
@@ -512,6 +599,7 @@ function RoomPage() {
     document.addEventListener("keydown", handleKeyDown);
     document.addEventListener("keyup", handleKeyUp);
 
+    // Only keyboard events on document, touch events are handled by specific elements
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
       document.removeEventListener("keyup", handleKeyUp);
@@ -626,28 +714,14 @@ function RoomPage() {
     navigate("/");
   };
 
-  // Calculate statistics
-  const completedSolves = useMemo(
-    () => Object.keys(solveTimes).length,
-    [solveTimes]
-  );
-  const currentAO5 = useMemo(
-    () => calculateAverage(solveTimes, 5),
-    [solveTimes]
-  );
-  const currentAO12 = useMemo(
-    () => calculateAverage(solveTimes, 12),
-    [solveTimes]
-  );
-  const bestSingle = useMemo(() => getBestSingle(solveTimes), [solveTimes]);
   // Daily Leaderboard popup modal
   if (showLeaderboardPopup) {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-2xl mx-4 max-h-[80vh] overflow-y-auto">
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg shadow-xl p-4 sm:p-8 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
           <div className="text-center mb-6">
             <div className="text-4xl mb-4">🏆</div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-2">
               Daily Leaderboard - Room {roomCode}
             </h2>
             <p className="text-gray-600">Yesterday's top performers</p>
@@ -658,12 +732,12 @@ function RoomPage() {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
               <p className="text-gray-600">Loading leaderboard...</p>
             </div>
-          ) : leaderboardData.length > 0 ? ( // Adjusted condition
+          ) : leaderboardData.length > 0 ? (
             <div className="space-y-4 mb-6">
               {leaderboardData.map((player, index) => (
                 <div
                   key={index}
-                  className={`flex items-center justify-between p-4 rounded-lg border ${
+                  className={`flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 rounded-lg border ${
                     index === 0
                       ? "bg-yellow-50 border-yellow-200"
                       : index === 1
@@ -673,7 +747,7 @@ function RoomPage() {
                       : "bg-white border-gray-200"
                   }`}
                 >
-                  <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-4 mb-3 sm:mb-0">
                     <div
                       className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
                         index === 0
@@ -697,27 +771,27 @@ function RoomPage() {
                       </div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="grid grid-cols-4 gap-4 text-sm">
-                      <div>
+                  <div className="w-full sm:w-auto">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 text-sm">
+                      <div className="text-center">
                         <div className="font-semibold text-green-600">
-                          {player.dailyPoints || 0}{" "}
+                          {player.dailyPoints || 0}
                         </div>
                         <div className="text-gray-500">Points</div>
                       </div>
-                      <div>
+                      <div className="text-center">
                         <div className="font-semibold text-orange-600">
                           {player.bestSingle || "--:--"}
                         </div>
                         <div className="text-gray-500">Single</div>
                       </div>
-                      <div>
+                      <div className="text-center">
                         <div className="font-semibold text-blue-600">
                           {player.ao5 || "--:--"}
                         </div>
                         <div className="text-gray-500">AO5</div>
                       </div>
-                      <div>
+                      <div className="text-center">
                         <div className="font-semibold text-purple-600">
                           {player.ao12 || "--:--"}
                         </div>
@@ -859,20 +933,9 @@ function RoomPage() {
                 </div>
                 <div className="text-gray-600">Current AO12</div>
               </div>
-              {/* <div className="text-center bg-indigo-100 rounded py-2">
-                <div className="text-sm font-bold text-indigo-600">
-                  {bestAO5 || "--:--"}
-                </div>
-                <div className="text-gray-600">Best AO5</div>
-              </div>
-              <div className="text-center bg-pink-100 rounded py-2">
-                <div className="text-sm font-bold text-pink-600">
-                  {bestAO12 || "--:--"}
-                </div>
-                <div className="text-gray-600">Best AO12</div>
-              </div> */}
             </div>
           </div>
+
           <div className="mb-6">
             <h2 className="text-xl font-bold text-gray-800 mb-4">
               Scramble {activeScramble + 1}
@@ -882,7 +945,12 @@ function RoomPage() {
             </div>
           </div>
 
-          <div className="mb-8">
+          {/* Touch-enabled timer area */}
+          <div
+            className="mb-8 select-none"
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+          >
             <div
               className={`text-7xl font-mono font-bold mb-4 ${
                 isTimerActive
@@ -900,10 +968,10 @@ function RoomPage() {
             <div className="text-gray-600 mb-4">
               {!isTimerActive &&
                 !isHoldingSpace &&
-                "Hold SPACEBAR to prepare, release to start"}
+                "Hold SPACEBAR or TOUCH & HOLD to prepare, release to start"}
               {isHoldingSpace && !canStartTimer && "Keep holding..."}
-              {isHoldingSpace && canStartTimer && "Release SPACEBAR to start!"}
-              {isTimerActive && "Press ANY KEY to stop the timer"}
+              {isHoldingSpace && canStartTimer && "Release to start!"}
+              {isTimerActive && "Press ANY KEY or TOUCH to stop the timer"}
             </div>
           </div>
 
@@ -918,6 +986,67 @@ function RoomPage() {
       </div>
     );
   }
+
+  // Completion popup modal
+  const CompletionPopup = () => (
+    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+        <div className="text-center">
+          {/* Success icon */}
+          <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-4">
+            <svg
+              className="h-6 w-6 text-green-600"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M5 13l4 4L19 7"
+              />
+            </svg>
+          </div>
+
+          {/* Title and message */}
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            Congratulations! 🎉
+          </h3>
+          <p className="text-gray-600 mb-6">
+            You've completed all 20 solves! Would you like to submit your
+            results now?
+          </p>
+
+          {/* Action buttons */}
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+            <button
+              onClick={() => {
+                setShowCompletionPopup(false);
+                submitStatistics(solveTimes);
+              }}
+              disabled={isSubmitting}
+              className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+            >
+              {isSubmitting ? "Submitting..." : "Submit Results"}
+            </button>
+
+            <button
+              onClick={() => setShowCompletionPopup(false)}
+              disabled={isSubmitting}
+              className="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-semibold py-3 px-4 rounded-lg transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+            >
+              Not Now
+            </button>
+          </div>
+
+          <p className="text-xs text-gray-500 mt-3">
+            You can submit your results later using the button below
+          </p>
+        </div>
+      </div>
+    </div>
+  );
 
   if (isLoading) {
     return (
@@ -949,7 +1078,7 @@ function RoomPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100 text-sm sm:text-base">
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
@@ -976,7 +1105,7 @@ function RoomPage() {
           </div>
 
           {/* Right Section: Buttons */}
-          <div className="flex items-center space-x-3">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
             <button
               onClick={() => setShowLeaderboardPopup(true)}
               className="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
@@ -989,9 +1118,17 @@ function RoomPage() {
             >
               📊 Weekly History
             </button>
+            {isMobile && (
+              <button
+                onClick={() => setShowMobileLeaderboard(true)}
+                className="bg-blue-500 hover:bg-yellow-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+              >
+                🏆 Weekly Leaderboard
+              </button>
+            )}
             <button
               onClick={handleBackToHome}
-              className="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg"
+              className="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
             >
               Leave Room
             </button>
@@ -1029,8 +1166,9 @@ function RoomPage() {
                   • Your solve times are automatically saved in your browser
                 </li>
                 <li>
-                  • At the end of the day, your best AO5, AO12, and best solve
-                  will be submitted
+                  • After you are done solving, click "Submit Statistics" to
+                  submit your times. This can be submitted at anytime even
+                  before 20 solves are completed.
                 </li>
                 <li>
                   • Compete with others in your room for daily and weekly
@@ -1064,7 +1202,7 @@ function RoomPage() {
             <h2 className="text-xl font-semibold text-gray-800 mb-4">
               Today's Challenge
             </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
               <div className="text-center p-4 bg-green-50 rounded-lg">
                 <div className="text-2xl font-bold text-green-600">
                   {completedSolves}/20
@@ -1105,50 +1243,61 @@ function RoomPage() {
           </div>
 
           {/* Scrambles List */}
-          <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">
               Scrambles
             </h3>
 
             {scrambles.length > 0 ? (
-              <div className="space-y-4">
+              <div className="space-y-3 sm:space-y-4">
                 {scrambles.map((scramble, index) => (
                   <div
                     key={index}
-                    className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                    className="border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
                   >
-                    <div className="flex items-center space-x-4">
-                      <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-semibold">
-                        {index + 1}
+                    {/* Header with number and action */}
+                    <div className="flex items-center justify-between p-3 sm:p-4 border-b border-gray-100">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-7 h-7 sm:w-8 sm:h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-semibold text-sm">
+                          {index + 1}
+                        </div>
+                        <span className="text-sm text-gray-600 font-medium">
+                          Scramble {index + 1}
+                        </span>
                       </div>
-                      <div className="font-mono text-sm text-gray-700 bg-gray-100 px-3 py-1 rounded">
-                        {scramble}
+
+                      {/* Action buttons */}
+                      <div className="flex items-center space-x-2">
+                        {solveTimes[index] ? (
+                          <>
+                            <button
+                              onClick={() => handleDNF(index)}
+                              className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs font-medium transition-colors"
+                            >
+                              DNF
+                            </button>
+                            <div className="bg-green-100 text-green-800 px-2 py-1 sm:px-4 sm:py-2 rounded font-mono text-xs sm:text-sm font-medium min-w-[60px] sm:min-w-[80px] text-center">
+                              {solveTimes[index].time === "DNF"
+                                ? "DNF"
+                                : `${formatTime(solveTimes[index].time)}s`}
+                            </div>
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => handleSolveClick(index)}
+                            className="bg-green-500 hover:bg-green-600 text-white px-3 py-1.5 rounded font-medium transition-colors text-sm"
+                          >
+                            Solve
+                          </button>
+                        )}
                       </div>
                     </div>
 
-                    <div className="flex items-center space-x-2">
-                      {solveTimes[index] ? (
-                        <>
-                          <button
-                            onClick={() => handleDNF(index)}
-                            className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg font-medium transition-colors text-sm"
-                          >
-                            DNF
-                          </button>
-                          <div className="bg-gray-100 px-4 py-2 rounded-lg font-mono text-sm min-w-[80px] text-center">
-                            {solveTimes[index].time === "DNF"
-                              ? "DNF"
-                              : `${formatTime(solveTimes[index].time)}s`}
-                          </div>
-                        </>
-                      ) : (
-                        <button
-                          onClick={() => handleSolveClick(index)}
-                          className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-medium transition-colors"
-                        >
-                          Solve
-                        </button>
-                      )}
+                    {/* Scramble content - full width */}
+                    <div className="p-3 sm:p-4">
+                      <div className="font-mono text-sm text-gray-700 bg-gray-50 px-3 py-3 rounded leading-relaxed break-all">
+                        {scramble}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -1156,7 +1305,9 @@ function RoomPage() {
             ) : (
               <div className="text-center py-8 text-gray-500">
                 <div className="text-4xl mb-4">🎲</div>
-                <p>No scrambles available for this room.</p>
+                <p className="text-sm sm:text-base">
+                  No scrambles available for this room.
+                </p>
               </div>
             )}
           </div>
@@ -1186,126 +1337,128 @@ function RoomPage() {
         </div>
 
         {/* Weekly Leaderboard Sidebar */}
-        <div className="w-80 flex-shrink-0">
-          <div className="bg-white rounded-lg shadow-md p-6 sticky top-8">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-800">
-                Weekly Leaderboard
-              </h3>
-              <button
-                onClick={() => {
-                  fetchWeeklyLeaderboard();
-                  fetchWeeklyBestStats();
-                }}
-                className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                disabled={
-                  isLoadingWeeklyLeaderboard || isLoadingWeeklyBestStats
-                }
-              >
-                {isLoadingWeeklyLeaderboard || isLoadingWeeklyBestStats
-                  ? "..."
-                  : "🔄"}
-              </button>
-            </div>
-
-            {/* Weekly Best Stats */}
-            {weeklyBestStats && (
-              <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                <h4 className="font-semibold text-gray-700 mb-3 text-sm">
-                  This Week's Best
-                </h4>
-                <div className="space-y-2 text-sm">
-                  {weeklyBestStats.bestAo5 && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Best AO5:</span>
-                      <span className="font-mono text-blue-600">
-                        {formatTime(weeklyBestStats.bestAo5)}s (
-                        {weeklyBestStats.bestAo5PlayerName})
-                      </span>
-                    </div>
-                  )}
-                  {weeklyBestStats.bestAo12 && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Best AO12:</span>
-                      <span className="font-mono text-purple-600">
-                        {formatTime(weeklyBestStats.bestAo12)}s (
-                        {weeklyBestStats.bestAo12PlayerName})
-                      </span>
-                    </div>
-                  )}
-                  {weeklyBestStats.bestSolve && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Best Solve:</span>
-                      <span className="font-mono text-green-600">
-                        {formatTime(weeklyBestStats.bestSolve)}s (
-                        {weeklyBestStats.bestSolvePlayerName})
-                      </span>
-                    </div>
-                  )}
-                </div>
+        {!isMobile && (
+          <div className="w-80 flex-shrink-0">
+            <div className="bg-white rounded-lg shadow-md p-6 sticky top-8">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-800">
+                  Weekly Leaderboard
+                </h3>
+                <button
+                  onClick={() => {
+                    fetchWeeklyLeaderboard();
+                    fetchWeeklyBestStats();
+                  }}
+                  className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                  disabled={
+                    isLoadingWeeklyLeaderboard || isLoadingWeeklyBestStats
+                  }
+                >
+                  {isLoadingWeeklyLeaderboard || isLoadingWeeklyBestStats
+                    ? "..."
+                    : "🔄"}
+                </button>
               </div>
-            )}
 
-            {isLoadingWeeklyLeaderboard ? (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500 mx-auto mb-2"></div>
-                <p className="text-gray-600 text-sm">Loading...</p>
-              </div>
-            ) : weeklyLeaderboardData.length > 0 ? (
-              <div className="space-y-3">
-                {weeklyLeaderboardData.map((player, index) => (
-                  <div
-                    key={`${player.roomCode}-${player.playerName}`}
-                    className={`flex items-center justify-between p-3 rounded-lg border ${
-                      index === 0
-                        ? "bg-yellow-50 border-yellow-200"
-                        : index === 1
-                        ? "bg-gray-50 border-gray-200"
-                        : index === 2
-                        ? "bg-orange-50 border-orange-200"
-                        : "bg-white border-gray-200"
-                    }`}
-                  >
-                    <div className="flex items-center space-x-3">
-                      <div
-                        className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                          index === 0
-                            ? "bg-yellow-500 text-white"
-                            : index === 1
-                            ? "bg-gray-500 text-white"
-                            : index === 2
-                            ? "bg-orange-500 text-white"
-                            : "bg-blue-100 text-blue-600"
-                        }`}
-                      >
-                        {index + 1}
+              {/* Weekly Best Stats */}
+              {weeklyBestStats && (
+                <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                  <h4 className="font-semibold text-gray-700 mb-3 text-sm">
+                    This Week's Best
+                  </h4>
+                  <div className="space-y-2 text-sm">
+                    {weeklyBestStats.bestAo5 && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Best AO5:</span>
+                        <span className="font-mono text-blue-600">
+                          {formatTime(weeklyBestStats.bestAo5)}s (
+                          {weeklyBestStats.bestAo5PlayerName})
+                        </span>
                       </div>
-                      <div>
-                        <div className="font-semibold text-gray-800 text-sm">
-                          {player.playerName}
+                    )}
+                    {weeklyBestStats.bestAo12 && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Best AO12:</span>
+                        <span className="font-mono text-purple-600">
+                          {formatTime(weeklyBestStats.bestAo12)}s (
+                          {weeklyBestStats.bestAo12PlayerName})
+                        </span>
+                      </div>
+                    )}
+                    {weeklyBestStats.bestSolve && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Best Solve:</span>
+                        <span className="font-mono text-green-600">
+                          {formatTime(weeklyBestStats.bestSolve)}s (
+                          {weeklyBestStats.bestSolvePlayerName})
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {isLoadingWeeklyLeaderboard ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500 mx-auto mb-2"></div>
+                  <p className="text-gray-600 text-sm">Loading...</p>
+                </div>
+              ) : weeklyLeaderboardData.length > 0 ? (
+                <div className="space-y-3">
+                  {weeklyLeaderboardData.map((player, index) => (
+                    <div
+                      key={`${player.roomCode}-${player.playerName}`}
+                      className={`flex items-center justify-between p-3 rounded-lg border ${
+                        index === 0
+                          ? "bg-yellow-50 border-yellow-200"
+                          : index === 1
+                          ? "bg-gray-50 border-gray-200"
+                          : index === 2
+                          ? "bg-orange-50 border-orange-200"
+                          : "bg-white border-gray-200"
+                      }`}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div
+                          className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                            index === 0
+                              ? "bg-yellow-500 text-white"
+                              : index === 1
+                              ? "bg-gray-500 text-white"
+                              : index === 2
+                              ? "bg-orange-500 text-white"
+                              : "bg-blue-100 text-blue-600"
+                          }`}
+                        >
+                          {index + 1}
+                        </div>
+                        <div>
+                          <div className="font-semibold text-gray-800 text-sm">
+                            {player.playerName}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-bold text-green-600">
-                        {player.weeklyPoints}
+                      <div className="text-right">
+                        <div className="font-bold text-green-600">
+                          {player.weeklyPoints}
+                        </div>
+                        <div className="text-xs text-gray-500">points</div>
                       </div>
-                      <div className="text-xs text-gray-500">points</div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                <div className="text-3xl mb-2">📊</div>
-                <p className="text-sm">No weekly rankings yet</p>
-                <p className="text-xs mt-1">
-                  Complete daily challenges to earn points!
-                </p>
-              </div>
-            )}
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <div className="text-3xl mb-2">📊</div>
+                  <p className="text-sm">No weekly rankings yet</p>
+                  <p className="text-xs mt-1">
+                    Complete daily challenges to earn points!
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Weekly History Modal */}
@@ -1406,6 +1559,140 @@ function RoomPage() {
           </div>
         </div>
       )}
+
+      {isMobile && showMobileLeaderboard && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+          <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4 max-h-[90vh] overflow-y-auto relative">
+            <button
+              onClick={() => setShowMobileLeaderboard(false)}
+              className="absolute top-2 right-2 text-gray-500 hover:text-gray-700 text-xl font-bold"
+            >
+              ×
+            </button>
+
+            {/* Modal Content */}
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">
+              Weekly Leaderboard
+            </h3>
+
+            {/* Refresh Button */}
+            <div className="flex justify-end mb-2">
+              <button
+                onClick={() => {
+                  fetchWeeklyLeaderboard();
+                  fetchWeeklyBestStats();
+                }}
+                className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                disabled={
+                  isLoadingWeeklyLeaderboard || isLoadingWeeklyBestStats
+                }
+              >
+                {isLoadingWeeklyLeaderboard || isLoadingWeeklyBestStats
+                  ? "..."
+                  : "🔄"}
+              </button>
+            </div>
+            {weeklyBestStats && (
+              <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                <h4 className="font-semibold text-gray-700 mb-3 text-sm">
+                  This Week's Best
+                </h4>
+                <div className="space-y-2 text-sm">
+                  {weeklyBestStats.bestAo5 && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Best AO5:</span>
+                      <span className="font-mono text-blue-600">
+                        {formatTime(weeklyBestStats.bestAo5)}s (
+                        {weeklyBestStats.bestAo5PlayerName})
+                      </span>
+                    </div>
+                  )}
+                  {weeklyBestStats.bestAo12 && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Best AO12:</span>
+                      <span className="font-mono text-purple-600">
+                        {formatTime(weeklyBestStats.bestAo12)}s (
+                        {weeklyBestStats.bestAo12PlayerName})
+                      </span>
+                    </div>
+                  )}
+                  {weeklyBestStats.bestSolve && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Best Solve:</span>
+                      <span className="font-mono text-green-600">
+                        {formatTime(weeklyBestStats.bestSolve)}s (
+                        {weeklyBestStats.bestSolvePlayerName})
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {isLoadingWeeklyLeaderboard ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500 mx-auto mb-2"></div>
+                <p className="text-gray-600 text-sm">Loading...</p>
+              </div>
+            ) : weeklyLeaderboardData.length > 0 ? (
+              <div className="space-y-3">
+                {weeklyLeaderboardData.map((player, index) => (
+                  <div
+                    key={`${player.roomCode}-${player.playerName}`}
+                    className={`flex items-center justify-between p-3 rounded-lg border ${
+                      index === 0
+                        ? "bg-yellow-50 border-yellow-200"
+                        : index === 1
+                        ? "bg-gray-50 border-gray-200"
+                        : index === 2
+                        ? "bg-orange-50 border-orange-200"
+                        : "bg-white border-gray-200"
+                    }`}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div
+                        className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                          index === 0
+                            ? "bg-yellow-500 text-white"
+                            : index === 1
+                            ? "bg-gray-500 text-white"
+                            : index === 2
+                            ? "bg-orange-500 text-white"
+                            : "bg-blue-100 text-blue-600"
+                        }`}
+                      >
+                        {index + 1}
+                      </div>
+                      <div>
+                        <div className="font-semibold text-gray-800 text-sm">
+                          {player.playerName}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-bold text-green-600">
+                        {player.weeklyPoints}
+                      </div>
+                      <div className="text-xs text-gray-500">points</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <div className="text-3xl mb-2">📊</div>
+                <p className="text-sm">No weekly rankings yet</p>
+                <p className="text-xs mt-1">
+                  Complete daily challenges to earn points!
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Completion popup modal */}
+      {showCompletionPopup && <CompletionPopup />}
     </div>
   );
 }

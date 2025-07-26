@@ -1244,7 +1244,7 @@ function RoomPage() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setShowTodayStatsPopup(true)}
-                  className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-1 px-2 rounded-lg transition-colors"
+                  className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
                 >
                   👥 View Opponents
                 </button>
@@ -1337,9 +1337,7 @@ function RoomPage() {
                   ) : todayStatsData.length === 0 ? (
                     <div className="text-center py-8">
                       <div className="text-gray-500 text-lg mb-2">🎯</div>
-                      <p className="text-gray-600 text-sm sm:text-base">
-                        No opponent data yet.
-                      </p>
+                      <p className="text-gray-600 text-sm sm:text-base">No opponent data yet.</p>
                       <p className="text-xs sm:text-sm text-gray-500 mt-1">
                         Be the first to submit!
                       </p>
@@ -1349,73 +1347,57 @@ function RoomPage() {
                       {/* Mobile Card View */}
                       <div className="block sm:hidden space-y-3">
                         {todayStatsData.map((player, index) => (
-                          <div
+                          <div 
                             key={index}
                             className={`rounded-lg border p-3 ${
-                              player.playerName === username
-                                ? "bg-blue-50 border-blue-200"
-                                : "bg-white border-gray-200"
+                              player.playerName === username 
+                                ? 'bg-blue-50 border-blue-200' 
+                                : 'bg-white border-gray-200'
                             }`}
                           >
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center gap-2">
-                                {player.playerName === username && (
-                                  <span className="text-blue-500">👤</span>
-                                )}
-                                <span
-                                  className={`font-medium text-sm ${
-                                    player.playerName === username
-                                      ? "text-blue-600"
-                                      : "text-gray-800"
-                                  }`}
-                                >
-                                  {player.playerName}
-                                </span>
-                                {player.playerName === username && (
-                                  <span className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded-full">
-                                    You
-                                  </span>
-                                )}
-                              </div>
-                              <span className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
-                                {player.completedSolves || 0}/20
+                            <div className="flex items-center gap-2 mb-2">
+                              {player.playerName === username && (
+                                <span className="text-blue-500">👤</span>
+                              )}
+                              <span className={`font-medium text-sm ${
+                                player.playerName === username ? 'text-blue-600' : 'text-gray-800'
+                              }`}>
+                                {player.playerName}
                               </span>
+                              {player.playerName === username && (
+                                <span className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded-full">
+                                  You
+                                </span>
+                              )}
                             </div>
                             <div className="grid grid-cols-3 gap-2 text-xs">
                               <div className="text-center">
                                 <div className="text-gray-500 mb-1">Best</div>
-                                <div
-                                  className={`font-mono font-semibold ${
-                                    player.bestSolve &&
-                                    player.bestSolve !== "--"
-                                      ? "text-green-600"
-                                      : "text-gray-400"
-                                  }`}
-                                >
+                                <div className={`font-mono font-semibold ${
+                                  player.bestSolve && player.bestSolve !== '--' 
+                                    ? 'text-green-600' 
+                                    : 'text-gray-400'
+                                }`}>
                                   {player.bestSolve ?? "--:--"}
                                 </div>
                               </div>
                               <div className="text-center">
                                 <div className="text-gray-500 mb-1">AO5</div>
-                                <div
-                                  className={`font-mono font-semibold ${
-                                    player.ao5 && player.ao5 !== "--"
-                                      ? "text-blue-600"
-                                      : "text-gray-400"
-                                  }`}
-                                >
+                                <div className={`font-mono font-semibold ${
+                                  player.ao5 && player.ao5 !== '--' 
+                                    ? 'text-blue-600' 
+                                    : 'text-gray-400'
+                                }`}>
                                   {player.ao5 ?? "--:--"}
                                 </div>
                               </div>
                               <div className="text-center">
                                 <div className="text-gray-500 mb-1">AO12</div>
-                                <div
-                                  className={`font-mono font-semibold ${
-                                    player.ao12 && player.ao12 !== "--"
-                                      ? "text-purple-600"
-                                      : "text-gray-400"
-                                  }`}
-                                >
+                                <div className={`font-mono font-semibold ${
+                                  player.ao12 && player.ao12 !== '--' 
+                                    ? 'text-purple-600' 
+                                    : 'text-gray-400'
+                                }`}>
                                   {player.ao12 ?? "--:--"}
                                 </div>
                               </div>
@@ -1429,31 +1411,18 @@ function RoomPage() {
                         <table className="w-full text-left border-collapse">
                           <thead>
                             <tr className="bg-gray-50 border-b-2 border-gray-200">
-                              <th className="py-3 px-4 font-semibold text-gray-800">
-                                Player
-                              </th>
-                              <th className="py-3 px-4 text-right font-semibold text-gray-800">
-                                Best Single
-                              </th>
-                              <th className="py-3 px-4 text-right font-semibold text-gray-800">
-                                AO5
-                              </th>
-                              <th className="py-3 px-4 text-right font-semibold text-gray-800">
-                                AO12
-                              </th>
-                              <th className="py-3 px-4 text-right font-semibold text-gray-800">
-                                Solves
-                              </th>
+                              <th className="py-3 px-4 font-semibold text-gray-800">Player</th>
+                              <th className="py-3 px-4 text-right font-semibold text-gray-800">Best Single</th>
+                              <th className="py-3 px-4 text-right font-semibold text-gray-800">AO5</th>
+                              <th className="py-3 px-4 text-right font-semibold text-gray-800">AO12</th>
                             </tr>
                           </thead>
                           <tbody>
                             {todayStatsData.map((player, index) => (
-                              <tr
-                                key={index}
+                              <tr 
+                                key={index} 
                                 className={`border-b border-gray-200 hover:bg-gray-50 transition-colors ${
-                                  player.playerName === username
-                                    ? "bg-blue-50 border-blue-200"
-                                    : ""
+                                  player.playerName === username ? 'bg-blue-50 border-blue-200' : ''
                                 }`}
                               >
                                 <td className="py-3 px-4">
@@ -1461,13 +1430,9 @@ function RoomPage() {
                                     {player.playerName === username && (
                                       <span className="text-blue-500">👤</span>
                                     )}
-                                    <span
-                                      className={`font-medium ${
-                                        player.playerName === username
-                                          ? "text-blue-600"
-                                          : "text-gray-800"
-                                      }`}
-                                    >
+                                    <span className={`font-medium ${
+                                      player.playerName === username ? 'text-blue-600' : 'text-gray-800'
+                                    }`}>
                                       {player.playerName}
                                     </span>
                                     {player.playerName === username && (
@@ -1478,42 +1443,30 @@ function RoomPage() {
                                   </div>
                                 </td>
                                 <td className="py-3 px-4 text-right font-mono">
-                                  <span
-                                    className={`${
-                                      player.bestSolve &&
-                                      player.bestSolve !== "--"
-                                        ? "text-green-600 font-semibold"
-                                        : "text-gray-400"
-                                    }`}
-                                  >
+                                  <span className={`${
+                                    player.bestSolve && player.bestSolve !== '--' 
+                                      ? 'text-green-600 font-semibold' 
+                                      : 'text-gray-400'
+                                  }`}>
                                     {player.bestSolve ?? "--:--"}
                                   </span>
                                 </td>
                                 <td className="py-3 px-4 text-right font-mono">
-                                  <span
-                                    className={`${
-                                      player.ao5 && player.ao5 !== "--"
-                                        ? "text-blue-600 font-semibold"
-                                        : "text-gray-400"
-                                    }`}
-                                  >
+                                  <span className={`${
+                                    player.ao5 && player.ao5 !== '--' 
+                                      ? 'text-blue-600 font-semibold' 
+                                      : 'text-gray-400'
+                                  }`}>
                                     {player.ao5 ?? "--:--"}
                                   </span>
                                 </td>
                                 <td className="py-3 px-4 text-right font-mono">
-                                  <span
-                                    className={`${
-                                      player.ao12 && player.ao12 !== "--"
-                                        ? "text-purple-600 font-semibold"
-                                        : "text-gray-400"
-                                    }`}
-                                  >
+                                  <span className={`${
+                                    player.ao12 && player.ao12 !== '--' 
+                                      ? 'text-purple-600 font-semibold' 
+                                      : 'text-gray-400'
+                                  }`}>
                                     {player.ao12 ?? "--:--"}
-                                  </span>
-                                </td>
-                                <td className="py-3 px-4 text-right">
-                                  <span className="text-sm bg-gray-100 text-gray-700 px-2 py-1 rounded">
-                                    {player.completedSolves || 0}/20
                                   </span>
                                 </td>
                               </tr>

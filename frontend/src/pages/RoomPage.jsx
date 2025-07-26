@@ -5,6 +5,7 @@ import {
   submitUsername,
   sendPlayerStatistics,
   getDailyLeaderboard,
+  getTodayStats,
   getWeeklyLeaderboard,
   getWeeklyBestStats,
 } from "../services/api";
@@ -63,6 +64,11 @@ function RoomPage() {
   const [leaderboardData, setLeaderboardData] = useState([]);
   const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(false);
 
+  // Today's stats states
+  const [showTodayStatsPopup, setShowTodayStatsPopup] = useState(false);
+  const [todayStatsData, setTodayStatsData] = useState([]);
+  const [isLoadingTodayStats, setIsLoadingTodayStats] = useState(false);
+
   // Weekly leaderboard states
   const [weeklyLeaderboardData, setWeeklyLeaderboardData] = useState([]);
   const [isLoadingWeeklyLeaderboard, setIsLoadingWeeklyLeaderboard] =
@@ -111,6 +117,52 @@ function RoomPage() {
   const markLeaderboardAsShown = () => {
     const todayUtc = new Date().toISOString().split("T")[0];
     localStorage.setItem(`leaderboard_shown_${roomCode}`, todayUtc);
+  };
+
+  const fetchScrambles = async () => {
+    setIsLoading(true);
+    setError("");
+
+    try {
+      // First, try to get scrambles from local storage
+      const storedScrambles = getScramblesFromStorage(roomCode);
+
+      if (storedScrambles && storedScrambles.length > 0) {
+        setScrambles(storedScrambles);
+        setIsLoading(false);
+        return;
+      }
+
+      // If no stored scrambles, fetch from API
+      const response = await getRoomScrambles(roomCode);
+      const scrambles = response.scrambles;
+
+      if (scrambles) {
+        setScrambles(scrambles);
+        saveScramblesToStorage(roomCode, scrambles);
+      } else {
+        setError("Failed to load scrambles or no scrambles found");
+      }
+    } catch (err) {
+      setError("Failed to load room data. Please try again.");
+      console.error("Fetch scrambles error:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchTodayStats = async () => {
+    if (!roomCode) return;
+
+    setIsLoadingTodayStats(true);
+    try {
+      const response = await getTodayStats(roomCode);
+      setTodayStatsData(response || []);
+    } catch (error) {
+      console.error("Failed to fetch today's stats:", error);
+    } finally {
+      setIsLoadingTodayStats(false);
+    }
   };
 
   // Fetch daily leaderboard
@@ -227,6 +279,14 @@ function RoomPage() {
     }
   };
 
+  const fetchAllData = async () => {
+    fetchScrambles();
+    fetchTodayStats();
+    fetchDailyLeaderboard();
+    fetchWeeklyLeaderboard();
+    fetchWeeklyBestStats();
+  };
+
   const generateWeeklyHistory = () => {
     // Get all unique weeks from both datasets
     const allWeeks = new Set();
@@ -286,10 +346,7 @@ function RoomPage() {
       const storedUsername = getUsernameFromStorage(roomCode);
       if (storedUsername) {
         setUsername(storedUsername);
-        fetchScrambles();
-        fetchDailyLeaderboard();
-        fetchWeeklyLeaderboard();
-        fetchWeeklyBestStats();
+        fetchAllData();
       } else {
         setShowUsernamePopup(true);
         setIsLoading(false);
@@ -423,38 +480,6 @@ function RoomPage() {
     saveBestAverageToStorage(roomCode, "ao12", curBestAo12);
   };
 
-  const fetchScrambles = async () => {
-    setIsLoading(true);
-    setError("");
-
-    try {
-      // First, try to get scrambles from local storage
-      const storedScrambles = getScramblesFromStorage(roomCode);
-
-      if (storedScrambles && storedScrambles.length > 0) {
-        setScrambles(storedScrambles);
-        setIsLoading(false);
-        return;
-      }
-
-      // If no stored scrambles, fetch from API
-      const response = await getRoomScrambles(roomCode);
-      const scrambles = response.scrambles;
-
-      if (scrambles) {
-        setScrambles(scrambles);
-        saveScramblesToStorage(roomCode, scrambles);
-      } else {
-        setError("Failed to load scrambles or no scrambles found");
-      }
-    } catch (err) {
-      setError("Failed to load room data. Please try again.");
-      console.error("Fetch scrambles error:", err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   // Timer functionality
   const stopTimer = () => {
     const finalTime = currentTimeRef.current.toFixed(2);
@@ -534,7 +559,7 @@ function RoomPage() {
         if (canStartTimer) {
           setIsTimerActive(true);
           setCurrentTime(0);
-          event.stopPropagation(); 
+          event.stopPropagation();
         }
       } else if (isTimerActive) {
         stopTimer();
@@ -681,10 +706,7 @@ function RoomPage() {
         setUsername(finalUsername);
         saveUsernameToStorage(roomCode, finalUsername);
         setShowUsernamePopup(false);
-        fetchScrambles();
-        fetchDailyLeaderboard();
-        fetchWeeklyLeaderboard();
-        fetchWeeklyBestStats();
+        fetchAllData(); // Fetch all data after username submission
       } else {
         // Handle case where API returns success: false
         setUsernameError(
@@ -1215,9 +1237,20 @@ function RoomPage() {
 
           {/* Room Info */}
           <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">
-              Today's Challenge
-            </h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-gray-800">
+                Today's Challenge
+              </h2>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowTodayStatsPopup(true)}
+                  className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-1 px-2 rounded-lg transition-colors"
+                >
+                  👥 View Opponents
+                </button>
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
               <div className="text-center p-4 bg-green-50 rounded-lg">
                 <div className="text-2xl font-bold text-green-600">
@@ -1257,6 +1290,243 @@ function RoomPage() {
               </div>
             </div>
           </div>
+
+          {/* Show popup of today's stats for the room */}
+          {showTodayStatsPopup && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-2 sm:p-4">
+              <div className="bg-white rounded-lg shadow-lg w-full max-w-sm sm:max-w-4xl max-h-[95vh] sm:max-h-[90vh] overflow-hidden">
+                {/* Header */}
+                <div className="bg-white border-b border-gray-200 px-3 sm:px-6 py-3 sm:py-4">
+                  <div className="flex items-center justify-between mb-2 sm:mb-0">
+                    <h3 className="text-lg sm:text-xl font-semibold text-gray-800">
+                      👥 Opponents
+                    </h3>
+                    <button
+                      onClick={() => setShowTodayStatsPopup(false)}
+                      className="text-gray-500 hover:text-gray-700 text-xl sm:hidden"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 mt-2 sm:mt-0">
+                    <button
+                      onClick={fetchTodayStats}
+                      className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-3 sm:px-4 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm sm:text-base"
+                      title="Refresh Stats"
+                    >
+                      🔄 <span className="sm:inline">Refresh</span>
+                    </button>
+                    <button
+                      onClick={() => setShowTodayStatsPopup(false)}
+                      className="hidden sm:flex bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors items-center gap-2"
+                    >
+                      ✕ Close
+                    </button>
+                  </div>
+                </div>
+
+                {/* Content */}
+                <div className="p-3 sm:p-6 overflow-y-auto max-h-[calc(95vh-120px)] sm:max-h-[calc(90vh-80px)]">
+                  {isLoadingTodayStats ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="text-gray-600 flex items-center gap-2 text-sm sm:text-base">
+                        <div className="animate-spin rounded-full h-5 w-5 sm:h-6 sm:w-6 border-b-2 border-blue-500"></div>
+                        Loading stats...
+                      </div>
+                    </div>
+                  ) : todayStatsData.length === 0 ? (
+                    <div className="text-center py-8">
+                      <div className="text-gray-500 text-lg mb-2">🎯</div>
+                      <p className="text-gray-600 text-sm sm:text-base">
+                        No opponent data yet.
+                      </p>
+                      <p className="text-xs sm:text-sm text-gray-500 mt-1">
+                        Be the first to submit!
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Mobile Card View */}
+                      <div className="block sm:hidden space-y-3">
+                        {todayStatsData.map((player, index) => (
+                          <div
+                            key={index}
+                            className={`rounded-lg border p-3 ${
+                              player.playerName === username
+                                ? "bg-blue-50 border-blue-200"
+                                : "bg-white border-gray-200"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                {player.playerName === username && (
+                                  <span className="text-blue-500">👤</span>
+                                )}
+                                <span
+                                  className={`font-medium text-sm ${
+                                    player.playerName === username
+                                      ? "text-blue-600"
+                                      : "text-gray-800"
+                                  }`}
+                                >
+                                  {player.playerName}
+                                </span>
+                                {player.playerName === username && (
+                                  <span className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded-full">
+                                    You
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
+                                {player.completedSolves || 0}/20
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-3 gap-2 text-xs">
+                              <div className="text-center">
+                                <div className="text-gray-500 mb-1">Best</div>
+                                <div
+                                  className={`font-mono font-semibold ${
+                                    player.bestSolve &&
+                                    player.bestSolve !== "--"
+                                      ? "text-green-600"
+                                      : "text-gray-400"
+                                  }`}
+                                >
+                                  {player.bestSolve ?? "--:--"}
+                                </div>
+                              </div>
+                              <div className="text-center">
+                                <div className="text-gray-500 mb-1">AO5</div>
+                                <div
+                                  className={`font-mono font-semibold ${
+                                    player.ao5 && player.ao5 !== "--"
+                                      ? "text-blue-600"
+                                      : "text-gray-400"
+                                  }`}
+                                >
+                                  {player.ao5 ?? "--:--"}
+                                </div>
+                              </div>
+                              <div className="text-center">
+                                <div className="text-gray-500 mb-1">AO12</div>
+                                <div
+                                  className={`font-mono font-semibold ${
+                                    player.ao12 && player.ao12 !== "--"
+                                      ? "text-purple-600"
+                                      : "text-gray-400"
+                                  }`}
+                                >
+                                  {player.ao12 ?? "--:--"}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Desktop Table View */}
+                      <div className="hidden sm:block overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                          <thead>
+                            <tr className="bg-gray-50 border-b-2 border-gray-200">
+                              <th className="py-3 px-4 font-semibold text-gray-800">
+                                Player
+                              </th>
+                              <th className="py-3 px-4 text-right font-semibold text-gray-800">
+                                Best Single
+                              </th>
+                              <th className="py-3 px-4 text-right font-semibold text-gray-800">
+                                AO5
+                              </th>
+                              <th className="py-3 px-4 text-right font-semibold text-gray-800">
+                                AO12
+                              </th>
+                              <th className="py-3 px-4 text-right font-semibold text-gray-800">
+                                Solves
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {todayStatsData.map((player, index) => (
+                              <tr
+                                key={index}
+                                className={`border-b border-gray-200 hover:bg-gray-50 transition-colors ${
+                                  player.playerName === username
+                                    ? "bg-blue-50 border-blue-200"
+                                    : ""
+                                }`}
+                              >
+                                <td className="py-3 px-4">
+                                  <div className="flex items-center gap-2">
+                                    {player.playerName === username && (
+                                      <span className="text-blue-500">👤</span>
+                                    )}
+                                    <span
+                                      className={`font-medium ${
+                                        player.playerName === username
+                                          ? "text-blue-600"
+                                          : "text-gray-800"
+                                      }`}
+                                    >
+                                      {player.playerName}
+                                    </span>
+                                    {player.playerName === username && (
+                                      <span className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded-full">
+                                        You
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="py-3 px-4 text-right font-mono">
+                                  <span
+                                    className={`${
+                                      player.bestSolve &&
+                                      player.bestSolve !== "--"
+                                        ? "text-green-600 font-semibold"
+                                        : "text-gray-400"
+                                    }`}
+                                  >
+                                    {player.bestSolve ?? "--:--"}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-4 text-right font-mono">
+                                  <span
+                                    className={`${
+                                      player.ao5 && player.ao5 !== "--"
+                                        ? "text-blue-600 font-semibold"
+                                        : "text-gray-400"
+                                    }`}
+                                  >
+                                    {player.ao5 ?? "--:--"}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-4 text-right font-mono">
+                                  <span
+                                    className={`${
+                                      player.ao12 && player.ao12 !== "--"
+                                        ? "text-purple-600 font-semibold"
+                                        : "text-gray-400"
+                                    }`}
+                                  >
+                                    {player.ao12 ?? "--:--"}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-4 text-right">
+                                  <span className="text-sm bg-gray-100 text-gray-700 px-2 py-1 rounded">
+                                    {player.completedSolves || 0}/20
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Scrambles List */}
           <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">

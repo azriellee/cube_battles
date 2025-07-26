@@ -132,6 +132,18 @@ export const sendPlayerStatistics = async (
 
 /* Leaderboard API calls */
 
+// Get today stats
+export const getTodayStats = async (roomCode) => {
+  try {
+    const response = await api.get(
+      `/leaderboard/today-stats/${roomCode}`
+    );
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
 // Get daily leaderboard data
 export const getDailyLeaderboard = async (roomCode) => {
   try {

@@ -11,7 +11,7 @@ const PORT = process.env.PORT || 8080;
 
 const allowedOrigins = [
   "https://cube-battles.web.app", // Your deployed frontend
-  "http://localhost:5173", // Optional: local dev environment
+  "http://localhost:5173",
 ];
 
 // Middleware
@@ -27,6 +27,11 @@ app.use(
     },
   })
 );
+// app.use(
+//   cors({
+//     origin: "*", // This tells the cors middleware to allow all origins
+//   })
+// );
 app.use(express.json());
 
 // Routes
@@ -50,8 +55,8 @@ process.on("SIGINT", async () => {
   process.exit(0);
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server running on http://0.0.0.0:${PORT}`);
 });
 
 export default app;

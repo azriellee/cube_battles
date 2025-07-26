@@ -4,7 +4,11 @@
 import express from "express";
 import { updateLeaderboardData } from "../cron_jobs/updateLeaderboard.js";
 import { PrismaClient } from "@prisma/client";
-import { getWeekStart, getPreviousDayDateRange } from "./dateUtils.js";
+import {
+  getWeekStart,
+  getPreviousDayDateRange,
+  getCurrentDayDateRange,
+} from "./dateUtils.js";
 
 const prisma = new PrismaClient();
 const router = express.Router();
@@ -118,6 +122,40 @@ router.get("/daily-leaderboard/:roomCode", async (req, res) => {
     console.error("Error fetching daily leaderboard:", error);
     res.status(500).json({
       error: "Failed to fetch daily leaderboard",
+      details: error.message,
+    });
+  }
+});
+
+// Get Todays stats for players in the room who have submitted (entry in roomStatistics)
+router.get("/today-stats/:roomCode", async (req, res) => {
+  try {
+    const { roomCode } = req.params;
+    const { startOfToday, endOfToday } = getCurrentDayDateRange();
+    console.log("fetching stats for date: ", startOfToday, endOfToday);
+    const todayStats = await prisma.roomStatistics.findMany({
+      where: {
+        roomCode: roomCode.toUpperCase(),
+        date: {
+          gte: startOfToday,
+          lt: endOfToday,
+        },
+      },
+      orderBy: [{ bestSolve: "asc" }, { ao5: "asc" }, { ao12: "asc" }],
+      select: {
+        playerName: true,
+        ao5: true,
+        ao12: true,
+        bestSolve: true,
+      },
+    });
+
+    res.json(todayStats);
+    console.log("Today's stats fetched successfully", todayStats);
+  } catch (error) {
+    console.error("Error fetching today's stats:", error);
+    res.status(500).json({
+      error: "Failed to fetch today's stats",
       details: error.message,
     });
   }

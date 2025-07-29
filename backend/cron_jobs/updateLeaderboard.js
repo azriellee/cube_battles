@@ -24,7 +24,7 @@ async function updateLeaderboardData() {
 
   if (yesterdayStats.length === 0) {
     console.log("No statistics found for startOfDay");
-    throw new Error("No statistics found for startOfDay"); // ✅ throw here
+    throw new Error("No statistics found for startOfDay");
   }
 
   const roomGroups = {};

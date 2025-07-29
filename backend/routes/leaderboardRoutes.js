@@ -39,7 +39,7 @@ router.get("/weekly-leaderboard/:roomCode", async (req, res) => {
       where: {
         roomCode: roomCode,
       },
-      orderBy: [{ weeklyPoints: "desc" }, { weekStart: "desc" }],
+      orderBy: [{ weekStart: "desc" }, { weeklyPoints: "desc" } ],
     });
 
     res.json(leaderboard);
@@ -49,7 +49,7 @@ router.get("/weekly-leaderboard/:roomCode", async (req, res) => {
   }
 });
 
-// GET /weekly-best-stats/:roomCode?weekStart=YYYY-MM-DD
+// Get weekly best stats for a room
 router.get("/weekly-best-stats/:roomCode", async (req, res) => {
   try {
     const { roomCode } = req.params;

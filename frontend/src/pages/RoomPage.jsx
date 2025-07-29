@@ -79,6 +79,9 @@ function RoomPage() {
   const [allWeeklyLeaderboardData, setAllWeeklyLeaderboardData] = useState([]);
   const [allWeeklyBestStats, setAllWeeklyBestStats] = useState([]);
   const [showWeeklyHistory, setShowWeeklyHistory] = useState(false);
+  const [isNewWeek, setIsNewWeek] = useState(false);
+  const [previousWeekLeaderboardData, setPreviousWeekLeaderboardData] =
+    useState([]);
 
   // Timer states
   const [activeScramble, setActiveScramble] = useState(null);
@@ -210,7 +213,8 @@ function RoomPage() {
       setAllWeeklyLeaderboardData(response || []);
 
       // Filter for current week
-      const currentWeekStart = getWeekStart(new Date());
+      const today = new Date();
+      const currentWeekStart = getWeekStart(today);
       const currentWeekData = (response || []).filter(
         (item) =>
           new Date(item.weekStart).getTime() === currentWeekStart.getTime()
@@ -219,6 +223,21 @@ function RoomPage() {
 
       // Save to local storage
       saveWeeklyLeaderboardToStorage(roomCode, response || []);
+
+      // check if today is the start of a new week, to display previous week's leaderboard popup
+      const todayStr = today.toISOString().split("T")[0];
+      const weekStartStr = currentWeekStart.toISOString().split("T")[0];
+      if (todayStr === weekStartStr) {
+        setIsNewWeek(true);
+        const previousWeekStart = new Date(
+          currentWeekStart.getTime() - 7 * 24 * 60 * 60 * 1000
+        );
+        const prevWeekData = (response || []).filter(
+          (item) =>
+            new Date(item.weekStart).getTime() === previousWeekStart.getTime()
+        );
+        setPreviousWeekLeaderboardData(prevWeekData);
+      }
     } catch (error) {
       console.error("Failed to fetch weekly leaderboard:", error);
 
@@ -863,6 +882,119 @@ function RoomPage() {
     );
   }
 
+  // Previous week leaderboard popup modal
+  // Weekly Leaderboard popup modal
+  if (isNewWeek && previousWeekLeaderboardData) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg shadow-xl p-4 sm:p-8 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+          <div className="text-center mb-6">
+            <div className="text-4xl mb-4">📅</div>
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-2">
+              Last Week’s Results
+            </h2>
+            <p className="text-gray-600">
+              Room {roomCode} — Weekly Top Performers
+            </p>
+          </div>
+
+          {previousWeekLeaderboardData.length > 0 ? (
+            <div className="space-y-4 mb-6">
+              <p className="text-green-600 font-medium text-sm mb-4">
+                🎉 Congratulations{" "}
+                <span className="font-semibold">
+                  {previousWeekLeaderboardData[0].playerName}
+                </span>{" "}
+                for topping the leaderboard!
+              </p>
+              {previousWeekLeaderboardData.map((player, index) => (
+                <div
+                  key={`${player.roomCode}-${player.playerName}`}
+                  className={`flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 rounded-lg border ${
+                    index === 0
+                      ? "bg-yellow-50 border-yellow-200"
+                      : index === 1
+                      ? "bg-gray-50 border-gray-200"
+                      : index === 2
+                      ? "bg-orange-50 border-orange-200"
+                      : "bg-white border-gray-200"
+                  }`}
+                >
+                  <div className="flex items-center space-x-4 mb-3 sm:mb-0">
+                    <div
+                      className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
+                        index === 0
+                          ? "bg-yellow-500 text-white"
+                          : index === 1
+                          ? "bg-gray-500 text-white"
+                          : index === 2
+                          ? "bg-orange-500 text-white"
+                          : "bg-blue-100 text-blue-600"
+                      }`}
+                    >
+                      {index + 1}
+                    </div>
+                    <div>
+                      <div className="font-semibold text-gray-800">
+                        {player.playerName}
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        {player.weekStart &&
+                          new Date(player.weekStart).toLocaleDateString()}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="w-full sm:w-auto">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 text-sm">
+                      <div className="text-center">
+                        <div className="font-semibold text-green-600">
+                          {player.weeklyPoints || 0}
+                        </div>
+                        <div className="text-gray-500">Points</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="font-semibold text-orange-600">
+                          {player.bestSingle || "--:--"}
+                        </div>
+                        <div className="text-gray-500">Single</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="font-semibold text-blue-600">
+                          {player.ao5 || "--:--"}
+                        </div>
+                        <div className="text-gray-500">AO5</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="font-semibold text-purple-600">
+                          {player.ao12 || "--:--"}
+                        </div>
+                        <div className="text-gray-500">AO12</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              <div className="text-4xl mb-4">📊</div>
+              <p>No weekly leaderboard data found.</p>
+            </div>
+          )}
+
+          <div className="flex justify-center">
+            <button
+              onClick={() => setIsNewWeek(false)}
+              className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
+            >
+              Continue to Room
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Username popup modal
   if (showUsernamePopup) {
     return (
@@ -1337,7 +1469,9 @@ function RoomPage() {
                   ) : todayStatsData.length === 0 ? (
                     <div className="text-center py-8">
                       <div className="text-gray-500 text-lg mb-2">🎯</div>
-                      <p className="text-gray-600 text-sm sm:text-base">No opponent data yet.</p>
+                      <p className="text-gray-600 text-sm sm:text-base">
+                        No opponent data yet.
+                      </p>
                       <p className="text-xs sm:text-sm text-gray-500 mt-1">
                         Be the first to submit!
                       </p>
@@ -1347,21 +1481,25 @@ function RoomPage() {
                       {/* Mobile Card View */}
                       <div className="block sm:hidden space-y-3">
                         {todayStatsData.map((player, index) => (
-                          <div 
+                          <div
                             key={index}
                             className={`rounded-lg border p-3 ${
-                              player.playerName === username 
-                                ? 'bg-blue-50 border-blue-200' 
-                                : 'bg-white border-gray-200'
+                              player.playerName === username
+                                ? "bg-blue-50 border-blue-200"
+                                : "bg-white border-gray-200"
                             }`}
                           >
                             <div className="flex items-center gap-2 mb-2">
                               {player.playerName === username && (
                                 <span className="text-blue-500">👤</span>
                               )}
-                              <span className={`font-medium text-sm ${
-                                player.playerName === username ? 'text-blue-600' : 'text-gray-800'
-                              }`}>
+                              <span
+                                className={`font-medium text-sm ${
+                                  player.playerName === username
+                                    ? "text-blue-600"
+                                    : "text-gray-800"
+                                }`}
+                              >
                                 {player.playerName}
                               </span>
                               {player.playerName === username && (
@@ -1373,31 +1511,38 @@ function RoomPage() {
                             <div className="grid grid-cols-3 gap-2 text-xs">
                               <div className="text-center">
                                 <div className="text-gray-500 mb-1">Best</div>
-                                <div className={`font-mono font-semibold ${
-                                  player.bestSolve && player.bestSolve !== '--' 
-                                    ? 'text-green-600' 
-                                    : 'text-gray-400'
-                                }`}>
+                                <div
+                                  className={`font-mono font-semibold ${
+                                    player.bestSolve &&
+                                    player.bestSolve !== "--"
+                                      ? "text-green-600"
+                                      : "text-gray-400"
+                                  }`}
+                                >
                                   {player.bestSolve ?? "--:--"}
                                 </div>
                               </div>
                               <div className="text-center">
                                 <div className="text-gray-500 mb-1">AO5</div>
-                                <div className={`font-mono font-semibold ${
-                                  player.ao5 && player.ao5 !== '--' 
-                                    ? 'text-blue-600' 
-                                    : 'text-gray-400'
-                                }`}>
+                                <div
+                                  className={`font-mono font-semibold ${
+                                    player.ao5 && player.ao5 !== "--"
+                                      ? "text-blue-600"
+                                      : "text-gray-400"
+                                  }`}
+                                >
                                   {player.ao5 ?? "--:--"}
                                 </div>
                               </div>
                               <div className="text-center">
                                 <div className="text-gray-500 mb-1">AO12</div>
-                                <div className={`font-mono font-semibold ${
-                                  player.ao12 && player.ao12 !== '--' 
-                                    ? 'text-purple-600' 
-                                    : 'text-gray-400'
-                                }`}>
+                                <div
+                                  className={`font-mono font-semibold ${
+                                    player.ao12 && player.ao12 !== "--"
+                                      ? "text-purple-600"
+                                      : "text-gray-400"
+                                  }`}
+                                >
                                   {player.ao12 ?? "--:--"}
                                 </div>
                               </div>
@@ -1411,18 +1556,28 @@ function RoomPage() {
                         <table className="w-full text-left border-collapse">
                           <thead>
                             <tr className="bg-gray-50 border-b-2 border-gray-200">
-                              <th className="py-3 px-4 font-semibold text-gray-800">Player</th>
-                              <th className="py-3 px-4 text-right font-semibold text-gray-800">Best Single</th>
-                              <th className="py-3 px-4 text-right font-semibold text-gray-800">AO5</th>
-                              <th className="py-3 px-4 text-right font-semibold text-gray-800">AO12</th>
+                              <th className="py-3 px-4 font-semibold text-gray-800">
+                                Player
+                              </th>
+                              <th className="py-3 px-4 text-right font-semibold text-gray-800">
+                                Best Single
+                              </th>
+                              <th className="py-3 px-4 text-right font-semibold text-gray-800">
+                                AO5
+                              </th>
+                              <th className="py-3 px-4 text-right font-semibold text-gray-800">
+                                AO12
+                              </th>
                             </tr>
                           </thead>
                           <tbody>
                             {todayStatsData.map((player, index) => (
-                              <tr 
-                                key={index} 
+                              <tr
+                                key={index}
                                 className={`border-b border-gray-200 hover:bg-gray-50 transition-colors ${
-                                  player.playerName === username ? 'bg-blue-50 border-blue-200' : ''
+                                  player.playerName === username
+                                    ? "bg-blue-50 border-blue-200"
+                                    : ""
                                 }`}
                               >
                                 <td className="py-3 px-4">
@@ -1430,9 +1585,13 @@ function RoomPage() {
                                     {player.playerName === username && (
                                       <span className="text-blue-500">👤</span>
                                     )}
-                                    <span className={`font-medium ${
-                                      player.playerName === username ? 'text-blue-600' : 'text-gray-800'
-                                    }`}>
+                                    <span
+                                      className={`font-medium ${
+                                        player.playerName === username
+                                          ? "text-blue-600"
+                                          : "text-gray-800"
+                                      }`}
+                                    >
                                       {player.playerName}
                                     </span>
                                     {player.playerName === username && (
@@ -1443,29 +1602,36 @@ function RoomPage() {
                                   </div>
                                 </td>
                                 <td className="py-3 px-4 text-right font-mono">
-                                  <span className={`${
-                                    player.bestSolve && player.bestSolve !== '--' 
-                                      ? 'text-green-600 font-semibold' 
-                                      : 'text-gray-400'
-                                  }`}>
+                                  <span
+                                    className={`${
+                                      player.bestSolve &&
+                                      player.bestSolve !== "--"
+                                        ? "text-green-600 font-semibold"
+                                        : "text-gray-400"
+                                    }`}
+                                  >
                                     {player.bestSolve ?? "--:--"}
                                   </span>
                                 </td>
                                 <td className="py-3 px-4 text-right font-mono">
-                                  <span className={`${
-                                    player.ao5 && player.ao5 !== '--' 
-                                      ? 'text-blue-600 font-semibold' 
-                                      : 'text-gray-400'
-                                  }`}>
+                                  <span
+                                    className={`${
+                                      player.ao5 && player.ao5 !== "--"
+                                        ? "text-blue-600 font-semibold"
+                                        : "text-gray-400"
+                                    }`}
+                                  >
                                     {player.ao5 ?? "--:--"}
                                   </span>
                                 </td>
                                 <td className="py-3 px-4 text-right font-mono">
-                                  <span className={`${
-                                    player.ao12 && player.ao12 !== '--' 
-                                      ? 'text-purple-600 font-semibold' 
-                                      : 'text-gray-400'
-                                  }`}>
+                                  <span
+                                    className={`${
+                                      player.ao12 && player.ao12 !== "--"
+                                        ? "text-purple-600 font-semibold"
+                                        : "text-gray-400"
+                                    }`}
+                                  >
                                     {player.ao12 ?? "--:--"}
                                   </span>
                                 </td>

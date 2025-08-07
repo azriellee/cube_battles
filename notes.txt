@@ -3,14 +3,11 @@ frontend: react + vite
 backend: nodejs + express
 
 future functions:
-1. Allow users to choose number of solves
-2. Live daily leaderboards
-3. Progressive Web Application
-3. live battles
-4. Implement User profiles, storing solve statistics for users
-5. battles with bets, using erc20 tokens and metamask integration
+1. live battles
+2. calculate elo for players and functionality to join random rooms
 
-todo:
-1. prune database every 2 weeks/ 1month? prune from room stats table, scrambles table and weekly best stats table. to see how much data 1 room of 3 people take
-2. include live leaderboard tracking for people's progress throughout the day
-3. Make it a PWA so that i can use on phone too
+next iteration:
+
+1. first will be a sign in/up page for users (cookie that lasts forever or smth so that users dont need to keep signing in)
+2. incorporate with google oauth
+3. next page allows users to choose game mode (1. practice mode (generic timer, count into player stats?), 2. battle rooms (current functionality), 3. live battles (future iteration))

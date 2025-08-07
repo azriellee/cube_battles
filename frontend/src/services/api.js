@@ -37,7 +37,35 @@ api.interceptors.response.use(
   }
 );
 
-/* Room API calls */
+/* Player data API calls */
+export const createPlayer = async (playerData) => {
+  try {
+    const response = await api.post("/player/create-player", { playerData });
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const getPlayerDetails = async (playerName) => {
+  try {
+    const response = await api.get(`/player/get-player/${playerName}`);
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const updatePlayerDetails = async (playerData) => {
+  try {
+    const response = await api.post(`/player/update-player-stats`, { playerData });
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
+/* Battle Room API calls */
 
 // Create a new room
 export const createRoom = async () => {

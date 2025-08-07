@@ -1,6 +1,5 @@
 import { Routes, Route } from 'react-router-dom'
-import HomePage from './pages/HomePage'
-import RoomPage from './pages/RoomPage'
+import { RoomPage, SignInPage, BattlesHomePage, HomePage, PracticeModePage } from './pages'
 
 function App() {
   return (
@@ -8,7 +7,10 @@ function App() {
       {/* Main app container with proper mobile viewport handling */}
       <div className="min-h-screen overflow-auto">
         <Routes>
-          <Route path="/" element={<HomePage />} />
+          <Route path="/" element={<SignInPage />} />
+          <Route path="/home" element={<HomePage />} />
+          <Route path="/practice-mode" element={<PracticeModePage />} />
+          <Route path="/battles-home" element={<BattlesHomePage />} />
           <Route path="/room/:roomCode" element={<RoomPage />} />
         </Routes>
       </div>

@@ -16,23 +16,23 @@ const allowedOrigins = [
 ];
 
 // Middleware
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      // Allow requests with no origin (e.g. curl or mobile apps)
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
-  })
-);
 // app.use(
 //   cors({
-//     origin: "*", // This tells the cors middleware to allow all origins
+//     origin: function (origin, callback) {
+//       // Allow requests with no origin (e.g. curl or mobile apps)
+//       if (!origin || allowedOrigins.includes(origin)) {
+//         callback(null, true);
+//       } else {
+//         callback(new Error("Not allowed by CORS"));
+//       }
+//     },
 //   })
 // );
+app.use(
+  cors({
+    origin: "*", // This tells the cors middleware to allow all origins
+  })
+);
 app.use(express.json());
 
 // Routes

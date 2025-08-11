@@ -10,6 +10,8 @@ import {
   getBestSingle,
 } from "../services/metrics";
 import { getScramble } from "../services/scramble";
+import { useNavigate } from "react-router-dom";
+import { useIsMobile } from "../services/hooks/useIsMobile";
 
 function PracticeModePage() {
   const [solveTimes, setSolveTimes] = useState({});
@@ -20,6 +22,11 @@ function PracticeModePage() {
   const [currentScramble, setCurrentScramble] = useState("");
   const [selectedSolve, setSelectedSolve] = useState(null);
   const [showScrambleModal, setShowScrambleModal] = useState(false);
+  // Mobile specific states
+  const isMobile = useIsMobile();
+  const [showMobileSolveHistory, setshowMobileSolveHistory] = useState(false);
+
+  const navigate = useNavigate();
 
   const currentTimeRef = useRef(0);
   const holdTimerRef = useRef(null);
@@ -170,11 +177,46 @@ function PracticeModePage() {
       document.removeEventListener("keydown", handleKeyDown);
       document.removeEventListener("keyup", handleKeyUp);
       document.removeEventListener("keydown", preventSpaceScroll);
-      if (holdTimerRef.current) {
-        clearTimeout(holdTimerRef.current);
-      }
     };
   }, [handleKeyDown, handleKeyUp]);
+
+  useEffect(() => {
+    const preventContextMenu = (e) => e.preventDefault();
+
+    // Prevent right-click / long-press context menu
+    document.addEventListener("contextmenu", preventContextMenu);
+
+    return () => {
+      document.removeEventListener("contextmenu", preventContextMenu);
+    };
+  }, []);
+
+  // Prevent accidental pull-to-refresh
+  useEffect(() => {
+    let touchStartY = 0;
+
+    const handleTouchStart = (e) => {
+      touchStartY = e.touches[0].clientY;
+    };
+
+    const handleTouchMove = (e) => {
+      const touchY = e.touches[0].clientY;
+      const scrollY = window.scrollY || document.documentElement.scrollTop;
+
+      if (scrollY <= 0 && touchY > touchStartY) {
+        // Prevent pull-to-refresh
+        e.preventDefault();
+      }
+    };
+
+    window.addEventListener("touchstart", handleTouchStart, { passive: false });
+    window.addEventListener("touchmove", handleTouchMove, { passive: false });
+
+    return () => {
+      window.removeEventListener("touchstart", handleTouchStart);
+      window.removeEventListener("touchmove", handleTouchMove);
+    };
+  }, []);
 
   // Global mobile touch-to-stop effect
   useEffect(() => {
@@ -240,6 +282,10 @@ function PracticeModePage() {
   const bestSingle = getBestSingle(solveTimes);
   const currentAo5 = calculateAverage(solveTimes, 5);
   const currentAo12 = calculateAverage(solveTimes, 12);
+  const currentAverage = calculateAverage(
+    solveTimes,
+    Object.keys(solveTimes).length
+  );
 
   // Prepare table data
   const tableData = Object.entries(solveTimes)
@@ -254,99 +300,108 @@ function PracticeModePage() {
     });
 
   return (
-    <div className="min-h-screen bg-gray-600 text-white p-6">
+    <div className="min-h-[calc(100vh-4rem)] w-full bg-gradient-to-br from-blue-900 via-gray-500 to-red-900 text-white p-6">
       <div className="max-w-7xl mx-auto">
+        {/* Top bar */}
+        <div className="mb-6 flex gap-3 flex-wrap">
+          <button
+            onClick={() => navigate("/")}
+            className="px-4 py-2 bg-green-700 hover:bg-green-900 text-white rounded transition-colors"
+          >
+            Home
+          </button>
+          {isMobile && (
+            <button
+              onClick={() => setshowMobileSolveHistory(true)}
+              className="bg-blue-500 hover:bg-yellow-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+            >
+              View Solve History
+            </button>
+          )}
+        </div>
         <div className="flex gap-8">
-          {/* Left Column - Table */}
-          <div className="w-80 flex-shrink-0">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">Solve Times</h2>
-              <button
-                onClick={clearAllSolves}
-                className="p-2 bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
-                title="Clear all solves"
-              >
-                <RotateCcw size={16} />
-              </button>
-            </div>
-            <div className="bg-gray-600 rounded-lg overflow-hidden grid grid-cols-4 gap-px">
-              {/* Header */}
-              <div className="p-3 text-center font-semibold bg-gray-800">#</div>
-              <div className="p-3 text-center font-semibold bg-gray-800">
-                Time
+          {/* Left Column - Table (desktop only) */}
+          {!isMobile && (
+            <div className="w-80 flex-shrink-0">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold">Solve Times</h2>
+                <button
+                  onClick={clearAllSolves}
+                  className="p-2 bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+                  title="Clear all solves"
+                >
+                  <RotateCcw size={16} />
+                </button>
               </div>
-              <div className="p-3 text-center font-semibold bg-gray-800">
-                Ao5
-              </div>
-              <div className="p-3 text-center font-semibold bg-gray-800">
-                Ao12
-              </div>
-
-              {/* Body */}
-              {tableData.length === 0 ? (
-                <div className="col-span-4 p-8 text-center text-gray-500">
-                  No solves yet. Press space to start timing!
+              <div className="bg-gray-600 rounded-lg overflow-hidden grid grid-cols-4 gap-px max-h-[500px] overflow-y-auto">
+                {/* Header */}
+                <div className="p-3 text-center font-semibold bg-gray-800">
+                  #
                 </div>
-              ) : (
-                tableData.map((solve, index) => (
-                  <React.Fragment key={solve.id}>
-                    {/* Solve Number + Eye icon */}
-                    <div
-                      className="bg-gray-700 p-3 text-center cursor-pointer"
-                      onClick={() => viewScramble(solve)}
-                    >
-                      <div className="flex items-center justify-center gap-2">
-                        <span>{tableData.length - index}</span>
-                        <Eye
-                          size={14}
-                          className="opacity-50 hover:opacity-100"
-                        />
+                <div className="p-3 text-center font-semibold bg-gray-800">
+                  Time
+                </div>
+                <div className="p-3 text-center font-semibold bg-gray-800">
+                  Ao5
+                </div>
+                <div className="p-3 text-center font-semibold bg-gray-800">
+                  Ao12
+                </div>
+
+                {/* Body */}
+                {tableData.length === 0 ? (
+                  <div className="col-span-4 p-8 text-center text-white">
+                    No solves yet. Press space to start timing!
+                  </div>
+                ) : (
+                  tableData.map((solve, index) => (
+                    <React.Fragment key={solve.id}>
+                      <div
+                        className="bg-gray-700 p-3 text-center cursor-pointer"
+                        onClick={() => viewScramble(solve)}
+                      >
+                        <div className="flex items-center justify-center gap-2">
+                          <span>{tableData.length - index}</span>
+                          <Eye
+                            size={14}
+                            className="opacity-50 hover:opacity-100"
+                          />
+                        </div>
                       </div>
-                    </div>
-
-                    {/* Solve Time */}
-                    <div className="bg-gray-700 p-3 text-center">
-                      {formatTime(solve.time)}
-                    </div>
-
-                    {/* Ao5 */}
-                    <div className="bg-gray-700 p-3 text-center">
-                      {formatTime(solve.ao5)}
-                    </div>
-
-                    {/* Ao12 */}
-                    <div className="bg-gray-700 p-3 text-center">
-                      {formatTime(solve.ao12)}
-                    </div>
-                  </React.Fragment>
-                ))
-              )}
+                      <div className="bg-gray-700 p-3 text-center">
+                        {formatTime(solve.time)}
+                      </div>
+                      <div className="bg-gray-700 p-3 text-center">
+                        {formatTime(solve.ao5)}
+                      </div>
+                      <div className="bg-gray-700 p-3 text-center">
+                        {formatTime(solve.ao12)}
+                      </div>
+                    </React.Fragment>
+                  ))
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Right Column - Timer */}
           <div
-            className="flex-1 flex flex-col items-center justify-center min-h-screen"
+            className="flex-1 flex flex-col items-center justify-center"
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
           >
             {/* Scramble */}
-            <div className="mb-8 text-center">
-              <div className="text-lg font-mono bg-gray-800 p-4 rounded-lg max-w-2xl">
+            <div className="mb-6 text-center w-full">
+              <div className="text-base sm:text-lg font-mono bg-gray-800 p-3 sm:p-4 rounded-lg w-full max-w-full sm:max-w-2xl mx-auto break-words">
                 {currentScramble}
               </div>
             </div>
 
             {/* Timer Container with background */}
-            <div className="bg-gray-800 rounded-xl p-12 mb-8 shadow-lg h-[300px] w-full max-w-2xl flex flex-col justify-center">
-              {/* Touch-enabled timer area */}
-              <div
-                className="select-none text-center flex-1 flex flex-col justify-center"
-                onTouchStart={handleTouchStart}
-                onTouchEnd={handleTouchEnd}
-              >
+            <div className="bg-gray-800 rounded-xl p-6 sm:p-12 mb-6 shadow-lg w-full max-w-full sm:max-w-2xl mx-auto flex flex-col justify-center min-h-[180px] sm:h-[300px]">
+              <div className="select-none text-center flex-1 flex flex-col justify-center">
                 <div
-                  className={`text-8xl font-mono font-bold mb-6 leading-none ${
+                  className={`font-mono font-bold mb-4 sm:mb-6 leading-none ${
                     isTimerActive
                       ? "text-green-600"
                       : isHoldingSpace
@@ -354,12 +409,12 @@ function PracticeModePage() {
                         ? "text-green-500"
                         : "text-red-500"
                       : "text-white"
-                  }`}
+                  } text-7xl sm:text-8xl`} // responsive font size
                 >
                   {formatTime(currentTime.toFixed(2))}
                 </div>
 
-                <div className="text-gray-400 h-6 flex items-center justify-center text-sm">
+                <div className="text-gray-400 h-6 flex items-center justify-center text-xs sm:text-sm text-center px-2">
                   {!isTimerActive &&
                     !isHoldingSpace &&
                     "Hold SPACEBAR or TOUCH & HOLD to prepare, release to start"}
@@ -371,28 +426,114 @@ function PracticeModePage() {
             </div>
 
             {/* Statistics */}
-            <div className="flex gap-8 text-center">
-              <div className="bg-gray-800 p-4 rounded-lg min-w-24">
-                <div className="text-gray-400 text-sm">Best</div>
-                <div className="text-2xl font-bold">
+            <div className="flex flex-wrap gap-4 justify-center">
+              <div className="bg-gray-800 p-3 sm:p-4 rounded-lg min-w-[80px] text-center">
+                <div className="text-gray-400 text-xs sm:text-sm">Best</div>
+                <div className="text-xl sm:text-2xl font-bold">
                   {formatTime(bestSingle) || "-"}
                 </div>
               </div>
-              <div className="bg-gray-800 p-4 rounded-lg min-w-24">
-                <div className="text-gray-400 text-sm">Ao5</div>
-                <div className="text-2xl font-bold">
+              <div className="bg-gray-800 p-3 sm:p-4 rounded-lg min-w-[80px] text-center">
+                <div className="text-gray-400 text-xs sm:text-sm">Ao5</div>
+                <div className="text-xl sm:text-2xl font-bold">
                   {formatTime(currentAo5) || "-"}
                 </div>
               </div>
-              <div className="bg-gray-800 p-4 rounded-lg min-w-24">
-                <div className="text-gray-400 text-sm">Ao12</div>
-                <div className="text-2xl font-bold">
+              <div className="bg-gray-800 p-3 sm:p-4 rounded-lg min-w-[80px] text-center">
+                <div className="text-gray-400 text-xs sm:text-sm">Ao12</div>
+                <div className="text-xl sm:text-2xl font-bold">
                   {formatTime(currentAo12) || "-"}
+                </div>
+              </div>
+              <div className="bg-gray-800 p-3 sm:p-4 rounded-lg min-w-[80px] text-center">
+                <div className="text-gray-400 text-xs sm:text-sm">Average</div>
+                <div className="text-xl sm:text-2xl font-bold">
+                  {formatTime(currentAverage) || "-"}
                 </div>
               </div>
             </div>
           </div>
         </div>
+
+        {/* Mobile Solve History Modal */}
+        {isMobile && showMobileSolveHistory && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-gray-900 rounded-lg max-w-sm w-full m-4 overflow-hidden">
+              <div className="flex justify-between items-center p-4 border-b border-gray-700">
+                <h2 className="text-lg font-bold">Solve History</h2>
+                <button
+                  onClick={clearAllSolves}
+                  className="p-3 bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+                  title="Clear all solves"
+                >
+                  <RotateCcw size={16} />
+                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => navigate("/")}
+                    className="px-3 py-1 bg-green-700 hover:bg-green-900 rounded text-sm"
+                  >
+                    Home
+                  </button>
+                  <button
+                    onClick={() => setshowMobileSolveHistory(false)}
+                    className="px-3 py-1 bg-gray-600 hover:bg-gray-700 rounded text-sm"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+              <div className="bg-gray-600 grid grid-cols-4 gap-px max-h-[70vh] overflow-y-auto text-sm">
+                {/* Header */}
+                <div className="p-2 text-center font-semibold bg-gray-800">
+                  #
+                </div>
+                <div className="p-2 text-center font-semibold bg-gray-800">
+                  Time
+                </div>
+                <div className="p-2 text-center font-semibold bg-gray-800">
+                  Ao5
+                </div>
+                <div className="p-2 text-center font-semibold bg-gray-800">
+                  Ao12
+                </div>
+
+                {/* Body */}
+                {tableData.length === 0 ? (
+                  <div className="col-span-4 p-6 text-center text-white">
+                    No solves yet.
+                  </div>
+                ) : (
+                  tableData.map((solve, index) => (
+                    <React.Fragment key={solve.id}>
+                      <div
+                        className="bg-gray-700 p-2 text-center cursor-pointer"
+                        onClick={() => viewScramble(solve)}
+                      >
+                        <div className="flex items-center justify-center gap-1">
+                          <span>{tableData.length - index}</span>
+                          <Eye
+                            size={12}
+                            className="opacity-50 hover:opacity-100"
+                          />
+                        </div>
+                      </div>
+                      <div className="bg-gray-700 p-2 text-center">
+                        {formatTime(solve.time)}
+                      </div>
+                      <div className="bg-gray-700 p-2 text-center">
+                        {formatTime(solve.ao5)}
+                      </div>
+                      <div className="bg-gray-700 p-2 text-center">
+                        {formatTime(solve.ao12)}
+                      </div>
+                    </React.Fragment>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Scramble Modal */}
         {showScrambleModal && selectedSolve && (

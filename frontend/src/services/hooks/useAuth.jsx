@@ -1,5 +1,5 @@
 import React, { useContext, useState, useEffect } from "react";
-import { auth } from "../firebase/firebase";
+import { auth } from "../../firebase/firebase";
 import { onAuthStateChanged, GoogleAuthProvider } from "firebase/auth";
 
 const AuthContext = React.createContext();
@@ -22,7 +22,6 @@ export function AuthProvider({ children }) {
 
   async function initializeUser(user) {
     if (user) {
-
       setCurrentUser({ ...user });
 
       // check if provider is email and password login
@@ -51,7 +50,7 @@ export function AuthProvider({ children }) {
     isEmailUser,
     isGoogleUser,
     currentUser,
-    setCurrentUser
+    setCurrentUser,
   };
 
   return (

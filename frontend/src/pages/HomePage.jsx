@@ -15,6 +15,7 @@ export default function Homepage() {
     {
       id: "practice",
       title: "Practice Mode",
+      info: "Practice your solves before battling!",
       icon: Target,
       path: "/practice-mode",
       color: "blue",
@@ -22,6 +23,7 @@ export default function Homepage() {
     {
       id: "battles",
       title: "Daily Battles",
+      info: "Create or Join rooms to battle friends!",
       icon: Trophy,
       path: "/battles-home",
       color: "green",
@@ -29,7 +31,7 @@ export default function Homepage() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-900 via-purple-900 to-gray-900 flex items-center justify-center p-4">
+    <div className="min-h-[calc(100vh-4rem)] w-full bg-gradient-to-br from-blue-500 via-green-800 to-gray-500 flex items-center justify-center p-4">
       <div className="w-full max-w-4xl">
         {/* Header Section */}
         <div className="text-center mb-12">
@@ -107,6 +109,11 @@ export default function Homepage() {
                   <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4 group-hover:text-white transition-colors duration-300">
                     {mode.title}
                   </h2>
+
+                  {/* Info */}
+                  <p className="text-gray-300 text-lg sm:text- max-w-2xl mx-auto mb-4">
+                    {mode.info}
+                  </p>
 
                   {/* Action Button */}
                   <button

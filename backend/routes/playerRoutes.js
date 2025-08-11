@@ -8,7 +8,7 @@ const router = express.Router();
 router.post("/create-player", async (req, res) => {
   try {
     const { playerName, email } = req.body;
-
+    console.log("Creating player:", playerName, email);
     await prisma.player.create({
       data: {
         playerName,
@@ -34,7 +34,6 @@ router.post("/create-player", async (req, res) => {
 router.get("/get-player/:playerName", async (req, res) => {
   try {
     const { playerName } = req.params;
-
     const player = await prisma.player.findUnique({
       where: { playerName },
     });
@@ -71,6 +70,8 @@ router.post("/update-player-stats", async (req, res) => {
   const { playerName, numSolves, totalTime, bestAo5, bestAo12, bestSolve } =
     req.body;
 
+  console.log("details received: ", req.body);
+
   try {
     const player = await prisma.player.findUnique({
       where: { playerName },
@@ -79,6 +80,16 @@ router.post("/update-player-stats", async (req, res) => {
     if (!player) {
       return res.status(404).json({ error: "Player not found" });
     }
+
+    // Convert string values to Float if they're not null/undefined
+    const parsedAo5 =
+      bestAo5 !== null && bestAo5 !== undefined ? parseFloat(bestAo5) : null;
+    const parsedAo12 =
+      bestAo12 !== null && bestAo12 !== undefined ? parseFloat(bestAo12) : null;
+    const parsedBestSolve =
+      bestSolve !== null && bestSolve !== undefined
+        ? parseFloat(bestSolve)
+        : null;
 
     const updatedPlayer = await prisma.player.update({
       where: { playerName },
@@ -90,16 +101,16 @@ router.post("/update-player-stats", async (req, res) => {
           increment: totalTime,
         },
         bestAo5:
-          player.bestAo5 == null || bestAo5 < player.bestAo5
-            ? bestAo5
+          player.bestAo5 == null || parsedAo5 < player.bestAo5
+            ? parsedAo5
             : player.bestAo5,
         bestAo12:
-          player.bestAo12 == null || bestAo12 < player.bestAo12
-            ? bestAo12
+          player.bestAo12 == null || parsedAo12 < player.bestAo12
+            ? parsedAo12
             : player.bestAo12,
         bestSolve:
-          player.bestSolve == null || bestSolve < player.bestSolve
-            ? bestSolve
+          player.bestSolve == null || parsedBestSolve < player.bestSolve
+            ? parsedBestSolve
             : player.bestSolve,
       },
     });
@@ -110,6 +121,29 @@ router.post("/update-player-stats", async (req, res) => {
   } catch (err) {
     console.error("Error updating player stats:", err);
     res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.get("/get-rooms/:playerName", async (req, res) => {
+  try {
+    const { playerName } = req.params;
+
+    // Find all roomParticipants with this playerName
+    const rooms = await prisma.roomParticipant.findMany({
+      where: { playerName },
+      select: {
+        roomCode: true, // Only select roomCode
+      },
+    });
+
+    if (!rooms || rooms.length === 0) {
+      return res.status(404).json({ error: "No rooms joined" });
+    }
+
+    res.json({ rooms });
+  } catch (error) {
+    console.error("Error fetching player rooms:", error);
+    res.status(500).json({ error: "Failed to fetch player rooms" });
   }
 });
 

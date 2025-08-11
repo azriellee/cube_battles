@@ -38,9 +38,12 @@ api.interceptors.response.use(
 );
 
 /* Player data API calls */
-export const createPlayer = async (playerData) => {
+export const createPlayer = async (playerName, email) => {
   try {
-    const response = await api.post("/player/create-player", { playerData });
+    const response = await api.post("/player/create-player", {
+      playerName,
+      email,
+    });
     return response;
   } catch (error) {
     throw error;
@@ -49,18 +52,36 @@ export const createPlayer = async (playerData) => {
 
 export const getPlayerDetails = async (playerName) => {
   try {
+    console.log("Sending get request for: ", playerName);
     const response = await api.get(`/player/get-player/${playerName}`);
+    console.log("response found: ", response);
+    return response;
+  } catch (error) {
+    if (error.response && error.response.status === 404) {
+      return null;
+    }
+    throw new Error(`Failed to get player details: ${error.message}`);
+  }
+};
+
+export const updatePlayerDetails = async (playerData) => {
+  try {
+    const response = await api.post(`/player/update-player-stats`, playerData);
     return response;
   } catch (error) {
     throw error;
   }
 };
 
-export const updatePlayerDetails = async (playerData) => {
+export const getPlayerRooms = async (playerName) => {
   try {
-    const response = await api.post(`/player/update-player-stats`, { playerData });
+    const response = await api.get(`/player/get-rooms/${playerName}`);
     return response;
   } catch (error) {
+    if (error.response && error.response.status === 404) {
+      // player has not joined any room yet
+      return null;
+    }
     throw error;
   }
 };
@@ -78,48 +99,15 @@ export const createRoom = async () => {
 };
 
 // Join an existing room
-export const joinRoom = async (roomCode) => {
+export const joinRoom = async (roomCode, playerName) => {
   try {
-    const response = await api.post("/roomRoutes/join", { roomCode });
+    const response = await api.post("/roomRoutes/join", {
+      roomCode,
+      playerName,
+    });
     return response;
   } catch (error) {
     throw error;
-  }
-};
-
-// Submit a username for the room
-export const submitUsername = async (roomCode, username) => {
-  try {
-    const response = await api.post("/roomRoutes/submit-username", {
-      roomCode,
-      username,
-    });
-    return { success: true, data: response }; // Note: response is already .data due to interceptor
-  } catch (error) {
-    if (error.response) {
-      // Now error.response exists because interceptor preserves original structure
-      throw {
-        success: false,
-        status: error.response.status,
-        error: error.response.data.error || "Unknown Error",
-        message: error.response.data.message || "An unexpected error occurred.",
-      };
-    } else if (error.request) {
-      // The request was made but no response was received (e.g., network error)
-      throw {
-        success: false,
-        error: "Network Error",
-        message:
-          "Could not connect to the server. Please check your internet connection.",
-      };
-    } else {
-      // Something happened in setting up the request that triggered an Error
-      throw {
-        success: false,
-        error: "Client Error",
-        message: "An unexpected client error occurred. Please try again.",
-      };
-    }
   }
 };
 
@@ -127,6 +115,16 @@ export const submitUsername = async (roomCode, username) => {
 export const getRoomScrambles = async (roomCode) => {
   try {
     const response = await api.get(`/roomRoutes/${roomCode}/scrambles`);
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// Get participants for a room
+export const getRoomParticipants = async (roomCode) => {
+  try {
+    const response = await api.get(`/roomRoutes/${roomCode}/participants`);
     return response;
   } catch (error) {
     throw error;
@@ -163,9 +161,7 @@ export const sendPlayerStatistics = async (
 // Get today stats
 export const getTodayStats = async (roomCode) => {
   try {
-    const response = await api.get(
-      `/leaderboard/today-stats/${roomCode}`
-    );
+    const response = await api.get(`/leaderboard/today-stats/${roomCode}`);
     return response;
   } catch (error) {
     throw error;

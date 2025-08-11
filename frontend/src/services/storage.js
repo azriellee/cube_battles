@@ -316,15 +316,6 @@ export const saveSubmissionStatusToStorage = (roomCode) => {
   }
 };
 
-// Username storage functions
-export const saveUsernameToStorage = (roomCode, username) => {
-  localStorage.setItem(`username_${roomCode}`, username);
-};
-
-export const getUsernameFromStorage = (roomCode) => {
-  return localStorage.getItem(`username_${roomCode}`);
-};
-
 // Save room data (for caching room info)
 export const saveRoomData = (roomCode, roomData) => {
   try {

@@ -19,7 +19,8 @@ export const doSignInWithEmailAndPassword = (email, password) => {
 
 export const doSignInWithGoogle = async () => {
   const provider = new GoogleAuthProvider();
-  await signInWithPopup(auth, provider);
+  const result = await signInWithPopup(auth, provider);
+  return result; 
 };
 
 export const doSignOut = () => {

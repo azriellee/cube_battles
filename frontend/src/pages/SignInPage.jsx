@@ -1,15 +1,18 @@
 import { useState } from "react";
 import { Eye, EyeOff, Mail, Lock, Chrome, User } from "lucide-react";
-import { 
+import {
   doSignInWithEmailAndPassword,
   doCreateUserWithEmailAndPassword,
   doSignInWithGoogle,
-  doPasswordReset
+  doPasswordReset,
 } from "../firebase/auth";
 import { updateProfile } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
-import { createPlayer, getPlayerDetails, updatePlayerDetails } from "../services/api";
-import { useAuth } from "../context/AuthContext";
+import {
+  createPlayer,
+  getPlayerDetails,
+  updatePlayerDetails,
+} from "../services/api";
 
 export default function SignInPage() {
   const [isSignUp, setIsSignUp] = useState(false);
@@ -24,7 +27,6 @@ export default function SignInPage() {
   const [resetEmailSent, setResetEmailSent] = useState(false);
   const [showPasswordReset, setShowPasswordReset] = useState(false);
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
 
   const validateForm = () => {
     if (!email || !password) {
@@ -49,37 +51,37 @@ export default function SignInPage() {
   const handleEmailAuth = async (e) => {
     e.preventDefault();
     setError("");
-    
+
     if (!validateForm()) return;
 
     setIsLoading(true);
     try {
       if (isSignUp) {
         // Create Firebase user
-        const userCredential = await doCreateUserWithEmailAndPassword(email, password);
-        
+        const userCredential = await doCreateUserWithEmailAndPassword(
+          email,
+          password
+        );
+
         // Update Firebase displayName
         await updateProfile(userCredential.user, {
-          displayName: playerName.trim()
+          displayName: playerName.trim(),
         });
-        
+
         // Create player in your database
-        await createPlayer({ 
-          playerName: playerName.trim(), 
-          email: userCredential.user.email 
-        });
-        
+        await createPlayer(playerName.trim(), userCredential.user.email);
+
         console.log("Registration successful");
       } else {
         await doSignInWithEmailAndPassword(email, password);
         console.log("Sign in successful");
       }
-      
+
       // Redirect to home or dashboard
-      navigate("/home");
+      navigate("/");
     } catch (err) {
       console.error("Authentication error:", err);
-      
+
       // Handle specific error cases
       if (err.message?.includes("email-already-in-use")) {
         setError("An account with this email already exists");
@@ -91,7 +93,9 @@ export default function SignInPage() {
         setError("No account found with this email");
       } else if (err.message?.includes("wrong-password")) {
         setError("Incorrect password");
-      } else if (err.message?.includes("Player with this email or name already exists")) {
+      } else if (
+        err.message?.includes("Player with this email or name already exists")
+      ) {
         setError("A player with this email or username already exists");
       } else {
         setError(err.message || "Authentication failed");
@@ -106,27 +110,37 @@ export default function SignInPage() {
     setIsLoading(true);
     try {
       const result = await doSignInWithGoogle();
-      
-      // For Google sign-in, create player profile if it doesn't exist
-      // The displayName should already be set from Google
-      if (currentUser) {
+
+      // Use the user from the sign-in result
+      const user = result?.user;
+      if (user) {
         try {
-          await createPlayer({ 
-            playerName: currentUser.displayName || currentUser.email.split('@')[0], 
-            email: currentUser.email 
-          });
-        } catch (err) {
-          if (err.response && err.response.status === 400) {
-            console.log("Existing player signing in...");
+          // Check if player exists first
+          const existingPlayer = await getPlayerDetails(user.displayName);
+          if (!existingPlayer) {
+            // Only create if player doesn't exist
+            const playerName = user.displayName || user.email.split("@")[0];
+            await createPlayer(playerName, user.email);
+
+            console.log("New player profile created");
           } else {
-            console.error("Error creating player profile:", err);
-            setError("Failed to create player profile");
-            return;
+            console.log(
+              "Existing player signed in:",
+              existingPlayer.playerName
+            );
+          }
+        } catch (err) {
+          // Only show error if it's not about player existing
+          if (!err.message?.includes("already exists")) {
+            console.error("Player profile error:", err);
+            setError("Failed to setup player profile");
+            return; // Don't navigate if there's a real error
           }
         }
       }
+
       // Redirect to home or dashboard
-      navigate("/home");
+      navigate("/");
       console.log("Google sign in successful");
     } catch (err) {
       console.error("Google sign in error:", err);
@@ -142,7 +156,7 @@ export default function SignInPage() {
       setError("Please enter your email address");
       return;
     }
-    
+
     setIsLoading(true);
     try {
       await doPasswordReset(email);
@@ -156,7 +170,7 @@ export default function SignInPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-900 via-purple-900 to-gray-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-500 via-green-800 to-gray-500 flex items-center justify-center p-4">
       <div className="bg-gray-800/90 backdrop-blur-sm rounded-2xl shadow-2xl p-6 sm:p-8 w-full max-w-sm sm:max-w-md border border-gray-700">
         <div className="text-center mb-8">
           <img
@@ -168,7 +182,9 @@ export default function SignInPage() {
             Cube Battles
           </h1>
           <p className="text-gray-300 text-base sm:text-lg">
-            {isSignUp ? "Create your account" : "Battle your friends in Rubik's cube solving!"}
+            {isSignUp
+              ? "Create your account"
+              : "Battle your friends in Rubik's cube solving!"}
           </p>
         </div>
 
@@ -291,7 +307,11 @@ export default function SignInPage() {
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition duration-200"
                   >
-                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    {showPassword ? (
+                      <EyeOff className="w-5 h-5" />
+                    ) : (
+                      <Eye className="w-5 h-5" />
+                    )}
                   </button>
                 </div>
               </div>
@@ -315,10 +335,16 @@ export default function SignInPage() {
                     />
                     <button
                       type="button"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      onClick={() =>
+                        setShowConfirmPassword(!showConfirmPassword)
+                      }
                       className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition duration-200"
                     >
-                      {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                      {showConfirmPassword ? (
+                        <EyeOff className="w-5 h-5" />
+                      ) : (
+                        <Eye className="w-5 h-5" />
+                      )}
                     </button>
                   </div>
                 </div>
@@ -334,7 +360,11 @@ export default function SignInPage() {
                        shadow-lg hover:shadow-xl transform hover:scale-105 disabled:transform-none
                        text-base sm:text-lg"
               >
-                {isLoading ? "Loading..." : (isSignUp ? "Create Account" : "Sign In")}
+                {isLoading
+                  ? "Loading..."
+                  : isSignUp
+                  ? "Create Account"
+                  : "Sign In"}
               </button>
             </div>
 

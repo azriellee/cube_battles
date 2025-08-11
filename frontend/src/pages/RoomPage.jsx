@@ -2,16 +2,14 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   getRoomScrambles,
-  submitUsername,
   sendPlayerStatistics,
   getDailyLeaderboard,
   getTodayStats,
   getWeeklyLeaderboard,
   getWeeklyBestStats,
+  updatePlayerDetails,
 } from "../services/api";
 import {
-  saveUsernameToStorage,
-  getUsernameFromStorage,
   saveScramblesToStorage,
   getScramblesFromStorage,
   saveSolveTimesToStorage,
@@ -34,18 +32,18 @@ import {
 } from "../services/metrics";
 import { getPreviousDayDateRange, getWeekStart } from "../services/dateUtils";
 import { useIsMobile } from "../services/hooks/useIsMobile";
+import { useAuth } from "../services/hooks/useAuth";
+import { useRoomParticipants } from "../services/hooks/useRoomParticipants";
+import RoomParticipantsModals from "../components/RoomParticipantsModal";
 
 function RoomPage() {
   const { roomCode } = useParams();
+  const { currentUser } = useAuth();
   const navigate = useNavigate();
   const [scrambles, setScrambles] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
-  const [showUsernamePopup, setShowUsernamePopup] = useState(false);
   const [username, setUsername] = useState("");
-  const [tempUsername, setTempUsername] = useState("");
-  const [usernameError, setUsernameError] = useState("");
-  const [isSubmittingUsername, setIsSubmittingUsername] = useState(false);
   const [solveTimes, setSolveTimes] = useState({});
   const [showInstructions, setShowInstructions] = useState(true);
   const [bestAO5, setBestAO5] = useState(null);
@@ -58,6 +56,9 @@ function RoomPage() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCompletionPopup, setShowCompletionPopup] = useState(false);
+
+  // Room Participants states
+  const roomParticipantsHook = useRoomParticipants(roomCode);
 
   // Daily leaderboard states
   const [showLeaderboardPopup, setShowLeaderboardPopup] = useState(false);
@@ -361,17 +362,11 @@ function RoomPage() {
   };
 
   useEffect(() => {
-    if (roomCode) {
-      const storedUsername = getUsernameFromStorage(roomCode);
-      if (storedUsername) {
-        setUsername(storedUsername);
-        fetchAllData();
-      } else {
-        setShowUsernamePopup(true);
-        setIsLoading(false);
-      }
+    if (roomCode && currentUser?.displayName) {
+      setUsername(currentUser.displayName);
+      fetchAllData();
     }
-  }, [roomCode]);
+  }, [roomCode, currentUser]);
 
   useEffect(() => {
     if (roomCode) {
@@ -396,6 +391,10 @@ function RoomPage() {
       const finalBestSingle = getBestSingle(solveTimes);
       const finalAO5 = bestAO5 || calculateAverage(solveTimes, 5);
       const finalAO12 = bestAO12 || calculateAverage(solveTimes, 12);
+      const totalTime = Object.values(solveTimes).reduce(
+        (sum, solve) => sum + solve.time,
+        0
+      );
 
       await sendPlayerStatistics(
         roomCode,
@@ -405,6 +404,15 @@ function RoomPage() {
         finalAO12,
         finalBestSingle
       );
+
+      await updatePlayerDetails({
+        playerName: username,
+        numSolves: completedSolves,
+        totalTime,
+        bestAo5: finalAO5,
+        bestAo12: finalAO12,
+        bestSolve: finalBestSingle,
+      });
 
       setStatisticsSubmitted(true);
       saveSubmissionStatusToStorage(roomCode);
@@ -501,7 +509,7 @@ function RoomPage() {
 
   // Timer functionality
   const stopTimer = () => {
-    const finalTime = currentTimeRef.current.toFixed(2);
+    const finalTime = Number(currentTimeRef.current.toFixed(2));
     setIsTimerActive(false);
 
     // Update local state
@@ -544,8 +552,6 @@ function RoomPage() {
     (event) => {
       if (activeScramble === null) return;
 
-      event.preventDefault();
-
       if (!isTimerActive && !isHoldingSpace) {
         setIsHoldingSpace(true);
         setCanStartTimer(false);
@@ -565,7 +571,9 @@ function RoomPage() {
     (event) => {
       if (activeScramble === null) return;
 
-      event.preventDefault();
+      if (isHoldingSpace || isTimerActive) {
+        event.preventDefault();
+      }
 
       if (event.currentTarget.holdTimer) {
         clearTimeout(event.currentTarget.holdTimer);
@@ -646,6 +654,52 @@ function RoomPage() {
     };
   }, [handleKeyDown, handleKeyUp]);
 
+  // Prevent accidental pull-to-refresh only when timer modal is active
+  useEffect(() => {
+    // Only add event listeners when the timer modal is active
+    if (activeScramble === null) {
+      return; // Exit early if modal is not active
+    }
+
+    let touchStartY = 0;
+    let touchStartTime = 0;
+
+    const handleTouchStart = (e) => {
+      touchStartY = e.touches[0].clientY;
+      touchStartTime = Date.now();
+    };
+
+    const handleTouchMove = (e) => {
+      const touchY = e.touches[0].clientY;
+      const scrollY = window.scrollY || document.documentElement.scrollTop;
+      const touchDeltaY = touchY - touchStartY;
+      const touchDuration = Date.now() - touchStartTime;
+      
+      // Prevent pull-to-refresh when modal is active and:
+      // 1. At the top of the page (scrollY <= 5 for some tolerance)
+      // 2. Pulling down (touchDeltaY > 5)
+      // 3. Any movement that could trigger refresh
+      // This is more aggressive to prevent refresh during timer interactions
+      if (scrollY <= 5 && touchDeltaY > 5) {
+        e.preventDefault();
+      }
+      
+      // Also prevent if user is holding space/timer and dragging
+      if ((isHoldingSpace || isTimerActive) && touchDeltaY > 0) {
+        e.preventDefault();
+      }
+    };
+
+    // Use non-passive listeners for both to enable preventDefault
+    document.addEventListener("touchstart", handleTouchStart, { passive: false });
+    document.addEventListener("touchmove", handleTouchMove, { passive: false });
+
+    return () => {
+      document.removeEventListener("touchstart", handleTouchStart);
+      document.removeEventListener("touchmove", handleTouchMove);
+    };
+  }, [activeScramble, isHoldingSpace, isTimerActive]);
+  
   // Global mobile touch-to-stop effect
   useEffect(() => {
     function handleGlobalTouchEnd(event) {
@@ -704,71 +758,8 @@ function RoomPage() {
     recomputeBestAverages(newSolveTimes);
   };
 
-  const handleUsernameSubmit = async (e) => {
-    e.preventDefault();
-    setUsernameError("");
-    setIsSubmittingUsername(true);
-
-    if (!tempUsername.trim()) {
-      setUsernameError("Username cannot be empty.");
-      setIsSubmittingUsername(false);
-      return;
-    }
-
-    const finalUsername = tempUsername.trim();
-
-    try {
-      // Await the API call
-      const result = await submitUsername(roomCode, finalUsername);
-
-      if (result.success) {
-        setUsername(finalUsername);
-        saveUsernameToStorage(roomCode, finalUsername);
-        setShowUsernamePopup(false);
-        fetchAllData(); // Fetch all data after username submission
-      } else {
-        // Handle case where API returns success: false
-        setUsernameError(
-          result.message || "Failed to submit username. Please try again."
-        );
-      }
-    } catch (error) {
-      console.error("Submit username error:", error);
-
-      // Handle different types of errors
-      if (error.status === 409) {
-        setUsernameError(
-          error.message ||
-            "Username is already taken. Please choose a different one."
-        );
-      } else if (error.status === 400) {
-        setUsernameError(
-          error.message || "Invalid username. Please check your input."
-        );
-      } else if (error.status === 500) {
-        setUsernameError("Server error. Please try again in a moment.");
-      } else if (
-        error.name === "NetworkError" ||
-        error.message === "Network Error"
-      ) {
-        setUsernameError(
-          "Connection failed. Please check your internet connection and try again."
-        );
-      } else if (error.name === "TimeoutError") {
-        setUsernameError("Request timed out. Please try again.");
-      } else {
-        // Generic error fallback
-        setUsernameError(
-          error.message || "Failed to submit username. Please try again later."
-        );
-      }
-    } finally {
-      setIsSubmittingUsername(false);
-    }
-  };
-
   const handleBackToHome = () => {
-    navigate("/");
+    navigate("/battles-home");
   };
 
   // Daily Leaderboard popup modal
@@ -995,88 +986,6 @@ function RoomPage() {
     );
   }
 
-  // Username popup modal
-  if (showUsernamePopup) {
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-md mx-4">
-          <div className="text-center mb-6">
-            <div className="text-4xl mb-4">🎲</div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">
-              Welcome to Room {roomCode}!
-            </h2>
-            <p className="text-gray-600">
-              Enter your username to join the cubing battle
-            </p>
-          </div>
-
-          <form onSubmit={handleUsernameSubmit}>
-            <div className="mb-6">
-              <label
-                htmlFor="username"
-                className="block text-sm font-medium text-gray-700 mb-2"
-              >
-                Username
-              </label>
-              <input
-                type="text"
-                id="username"
-                value={tempUsername}
-                onChange={(e) => setTempUsername(e.target.value)}
-                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                  usernameError ? "border-red-300 bg-red-50" : "border-gray-300"
-                }`}
-                placeholder="Enter your username"
-                maxLength={20}
-                required
-                autoFocus
-                disabled={isSubmittingUsername}
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Maximum 20 characters
-              </p>
-
-              {/* Error display */}
-              {usernameError && (
-                <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-lg">
-                  <p className="text-red-600 text-sm flex items-center">
-                    <span className="mr-1">⚠️</span>
-                    {usernameError}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={handleBackToHome}
-                className="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
-                disabled={isSubmittingUsername}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
-                disabled={!tempUsername.trim() || isSubmittingUsername}
-              >
-                {isSubmittingUsername ? (
-                  <span className="flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Joining...
-                  </span>
-                ) : (
-                  "Join Room"
-                )}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    );
-  }
-
   // Timer popup modal
   if (activeScramble !== null) {
     return (
@@ -1248,7 +1157,7 @@ function RoomPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 text-sm sm:text-base">
+    <div className="min-h-[calc(100vh-4rem)] w-full bg-gray-100 text-sm sm:text-base">
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
@@ -1297,10 +1206,16 @@ function RoomPage() {
               </button>
             )}
             <button
+              onClick={roomParticipantsHook.handleShowRoomParticipants}
+              className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+            >
+              👥 Room Participants
+            </button>
+            <button
               onClick={handleBackToHome}
               className="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
             >
-              Leave Room
+              Home
             </button>
           </div>
         </div>
@@ -2098,6 +2013,23 @@ function RoomPage() {
 
       {/* Completion popup modal */}
       {showCompletionPopup && <CompletionPopup />}
+      <RoomParticipantsModals
+        // States
+        showRoomParticipants={roomParticipantsHook.showRoomParticipants}
+        roomParticipants={roomParticipantsHook.roomParticipants}
+        isLoadingParticipants={roomParticipantsHook.isLoadingParticipants}
+        selectedPlayerDetails={roomParticipantsHook.selectedPlayerDetails}
+        showPlayerProfile={roomParticipantsHook.showPlayerProfile}
+        isLoadingPlayerDetails={roomParticipantsHook.isLoadingPlayerDetails}
+        // Actions
+        fetchRoomParticipants={roomParticipantsHook.fetchRoomParticipants}
+        handleViewPlayerProfile={roomParticipantsHook.handleViewPlayerProfile}
+        closeRoomParticipants={roomParticipantsHook.closeRoomParticipants}
+        closePlayerProfile={roomParticipantsHook.closePlayerProfile}
+        // Props
+        roomCode={roomCode}
+        username={username}
+      />
     </div>
   );
 }

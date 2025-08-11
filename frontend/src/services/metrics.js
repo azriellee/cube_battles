@@ -10,7 +10,11 @@ export const formatTime = (time) => {
 };
 
 export const calculateAverage = (solveTimes, count) => {
-  if (!solveTimes || Object.keys(solveTimes).length < count) return null;
+  if (
+    Object.keys(solveTimes).length === 0 ||
+    Object.keys(solveTimes).length < count
+  )
+    return null;
 
   // Get the most recent solves based on timestamp
   const recentSolves = Object.values(solveTimes)
@@ -28,6 +32,12 @@ export const calculateAverage = (solveTimes, count) => {
     .filter((time) => time !== "DNF")
     .map((time) => parseFloat(time))
     .filter((time) => !isNaN(time));
+
+  // If count == number of valid times, return average of all solves
+  if (validTimes.length === count) {
+    const sum = validTimes.reduce((a, b) => a + b, 0);
+    return (sum / validTimes.length).toFixed(2);
+  }
 
   // Sort valid times
   const sortedTimes = [...validTimes].sort((a, b) => a - b);

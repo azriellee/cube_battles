@@ -65,11 +65,13 @@ router.post("/create", async (req, res) => {
 // Join an existing room
 router.post("/join", async (req, res) => {
   try {
-    const { roomCode } = req.body;
+    const { roomCode, playerName } = req.body;
 
-    if (!roomCode) {
+    if (!roomCode || !playerName) {
       return res.status(400).json({
-        error: "Room code is required",
+        success: false,
+        error: "Missing required fields",
+        message: "Room code and playerName are required.",
       });
     }
 
@@ -85,10 +87,31 @@ router.post("/join", async (req, res) => {
       });
     }
 
-    res.json({
+    const upperRoomCode = roomCode.toUpperCase();
+
+    const existingParticipant = await prisma.roomParticipant.findUnique({
+      where: {
+        roomCode_playerName: {
+          roomCode: upperRoomCode,
+          playerName: playerName,
+        },
+      },
+    });
+
+    if (!existingParticipant) {
+      await prisma.roomParticipant.create({
+        data: {
+          roomCode: upperRoomCode,
+          playerName: playerName,
+        },
+      });
+    }
+
+    res.status(200).json({
       success: true,
-      roomCode: room.code,
-      message: "Successfully joined room",
+      message: `Welcome, ${playerName}! You have successfully joined room ${roomCode}.`,
+      roomCode: upperRoomCode,
+      playerName: playerName,
     });
   } catch (error) {
     console.error("Error joining room:", error);
@@ -96,55 +119,6 @@ router.post("/join", async (req, res) => {
       error: "Failed to join room",
       details: error.message,
     });
-  }
-});
-
-// Submit a username for the room
-router.post("/submit-username", async (req, res) => {
-  try {
-    const { roomCode, username } = req.body;
-
-    if (!roomCode || !username) {
-      return res.status(400).json({
-        success: false,
-        error: "Missing required fields",
-        message: "Room code and username are required.",
-      });
-    }
-
-    const upperRoomCode = roomCode.toUpperCase();
-
-    await prisma.roomParticipant.create({
-      data: {
-        roomCode: upperRoomCode,
-        playerName: username,
-      },
-    });
-
-    res.status(200).json({
-      success: true,
-      message: `Welcome, ${username}! You have successfully joined room ${roomCode}.`,
-      roomCode: upperRoomCode,
-      playerName: username,
-    });
-  } catch (error) {
-    console.error("Error in /submit-username endpoint:", error);
-    
-    // Check if it's a unique constraint violation
-    if (error.code === "P2002") {
-      return res.status(409).json({
-        success: false,
-        error: "Username taken",
-        message: `The username '${req.body.username}' is already taken in room '${req.body.roomCode}'. Please choose a different one.`,
-      });
-    } else {
-      return res.status(500).json({
-        success: false,
-        error: "Server error",
-        message: "An unexpected error occurred while processing your request.",
-        details: error.message,
-      });
-    }
   }
 });
 
@@ -172,6 +146,34 @@ router.get("/:roomCode/scrambles", async (req, res) => {
     });
   }
 });
+
+// Get room participants
+router.get("/:roomCode/participants", async (req, res) => {
+  try {
+    const { roomCode } = req.params;
+
+    const participants = await prisma.roomParticipant.findMany({
+      where: { roomCode: roomCode.toUpperCase() },
+      select: {
+        playerName: true,
+      },
+    });
+
+    if (!participants) {
+      return res.status(404).json({
+        error: "No participants found",
+      });
+    }
+    res.json(participants);
+  } catch (error) {
+    console.error("Error fetching room participants:", error);
+    res.status(500).json({
+      error: "Failed to fetch room information",
+      details: error.message,
+    });
+  }
+});
+
 
 router.post("/updateStatistics", async (req, res) => {
   try {

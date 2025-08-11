@@ -6,6 +6,7 @@
 const STORAGE_KEYS = {
   SCRAMBLES: "cube_battles_scrambles",
   SOLVE_TIMES: "cube_battles_solve_times",
+  PRACTICE_TIMES: "cube_battles_practice_times",
   ROOM_DATA: "cube_battles_room_data",
   RESULTS_SUBMITTED: "cube_battles_submitted",
 };
@@ -117,6 +118,32 @@ export const saveSolveTimesToStorage = (roomCode, solveTimes) => {
   } catch (error) {
     console.error("Error saving solve times:", error);
   }
+};
+
+export const savePracticeTimesToStorage = (solveTimes) => {
+  try {
+    const solveData = {
+      date: getTodayString(),
+      solves: solveTimes,
+      timestamp: Date.now(),
+    };
+    localStorage.setItem(STORAGE_KEYS.PRACTICE_TIMES, JSON.stringify(solveData));
+  } catch (error) {
+    console.error("Error saving solve times:", error);
+  }
+};
+
+export const loadPracticeTimesFromStorage = () => {
+  try {
+    const data = localStorage.getItem(STORAGE_KEYS.PRACTICE_TIMES);
+    if (data) {
+      const parsed = JSON.parse(data);
+      return parsed.solves || {};
+    }
+  } catch (error) {
+    console.error("Error loading solve times:", error);
+  }
+  return {};
 };
 
 // Get all solve times for a room
@@ -287,15 +314,6 @@ export const saveSubmissionStatusToStorage = (roomCode) => {
   } catch (error) {
     console.error("Error saving submission status:", error);
   }
-};
-
-// Username storage functions
-export const saveUsernameToStorage = (roomCode, username) => {
-  localStorage.setItem(`username_${roomCode}`, username);
-};
-
-export const getUsernameFromStorage = (roomCode) => {
-  return localStorage.getItem(`username_${roomCode}`);
 };
 
 // Save room data (for caching room info)

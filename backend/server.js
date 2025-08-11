@@ -3,6 +3,7 @@ import cors from "cors";
 import { PrismaClient } from "@prisma/client";
 import roomRoutes from "./routes/roomRoutes.js";
 import leaderboardRoutes from "./routes/leaderboardRoutes.js";
+import playerRoutes from "./routes/playerRoutes.js";
 import "./cron_jobs/updateLeaderboard.js";
 
 const app = express();
@@ -15,28 +16,29 @@ const allowedOrigins = [
 ];
 
 // Middleware
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      // Allow requests with no origin (e.g. curl or mobile apps)
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
-  })
-);
 // app.use(
 //   cors({
-//     origin: "*", // This tells the cors middleware to allow all origins
+//     origin: function (origin, callback) {
+//       // Allow requests with no origin (e.g. curl or mobile apps)
+//       if (!origin || allowedOrigins.includes(origin)) {
+//         callback(null, true);
+//       } else {
+//         callback(new Error("Not allowed by CORS"));
+//       }
+//     },
 //   })
 // );
+app.use(
+  cors({
+    origin: "*", // This tells the cors middleware to allow all origins
+  })
+);
 app.use(express.json());
 
 // Routes
 app.use("/api/roomRoutes", roomRoutes);
 app.use("/api/leaderboard", leaderboardRoutes);
+app.use("/api/player", playerRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

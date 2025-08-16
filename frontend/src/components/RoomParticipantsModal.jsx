@@ -245,9 +245,12 @@ const RoomParticipantsModals = ({
                 </p>
                 <p>
                   <span className="text-gray-700">Total Solves:</span>{" "}
-                  {selectedPlayerDetails.totalSolves ?? 0}
+                  {selectedPlayerDetails.numSolves ?? 0}
                 </p>
-                {/* Add any other fields you want to show in this simple format */}
+                <p>
+                <span className="text-gray-700">Total Solves:</span>{" "}
+                  {formatDate(selectedPlayerDetails.dateJoined) ?? 0}
+                </p>
               </div>
             ) : (
               <div className="text-center text-red-500">

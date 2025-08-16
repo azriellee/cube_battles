@@ -52,9 +52,7 @@ export const createPlayer = async (playerName, email) => {
 
 export const getPlayerDetails = async (playerName) => {
   try {
-    console.log("Sending get request for: ", playerName);
     const response = await api.get(`/player/get-player/${playerName}`);
-    console.log("response found: ", response);
     return response;
   } catch (error) {
     if (error.response && error.response.status === 404) {

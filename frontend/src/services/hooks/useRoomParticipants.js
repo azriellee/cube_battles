@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { getRoomParticipants, getPlayerDetails } from '../api';
+import { useState } from "react";
+import { getRoomParticipants, getPlayerDetails } from "../api";
 
 export const useRoomParticipants = (roomCode) => {
   // States
@@ -30,7 +30,6 @@ export const useRoomParticipants = (roomCode) => {
       setIsLoadingPlayerDetails(true);
       setShowPlayerProfile(true);
       const playerDetails = await getPlayerDetails(playerName);
-      console.log("player details: ", playerDetails);
       setSelectedPlayerDetails(playerDetails);
     } catch (error) {
       console.error("Error fetching player details:", error);
@@ -65,7 +64,7 @@ export const useRoomParticipants = (roomCode) => {
     selectedPlayerDetails,
     showPlayerProfile,
     isLoadingPlayerDetails,
-    
+
     // Actions
     handleShowRoomParticipants,
     fetchRoomParticipants,

@@ -1,13 +1,12 @@
-// import cron from "node-cron";
 import { PrismaClient } from "@prisma/client";
 import { getWeekStart, getPreviousDayDateRange } from "../routes/dateUtils.js";
 
 const prisma = new PrismaClient();
+const BEST_SOLVE_POINTS = 4;
+const BEST_AO5_POINTS = 3;
+const BEST_AO12_POINTS = 3;
 
-// Daily cron job to do the following:
-// 1. Read the roomstatistics data and update the weekly leaderboard points
-// 2. Update weekly best stats table if there are changes to week's best ao5, ao12, bestSolve
-// UPDATE: exposed endpoint to manually trigger leaderboard update, scheduled using cloud scheduler on GCR
+// Orchestration function: run both updates
 async function updateLeaderboardData() {
   console.log("Starting daily leaderboard update...");
 
@@ -27,6 +26,17 @@ async function updateLeaderboardData() {
     throw new Error("No statistics found for startOfDay");
   }
 
+  // Run sub-tasks
+  await Promise.all([
+    updateWeeklyLeaderboard(yesterdayStats, startOfDay, endOfDay),
+    updateWeeklyBestStats(yesterdayStats, startOfDay),
+  ]);
+}
+
+/**
+ * Update weekly leaderboard by awarding points for daily bests
+ */
+async function updateWeeklyLeaderboard(yesterdayStats, startOfDay, endOfDay) {
   const roomGroups = {};
   yesterdayStats.forEach((stat) => {
     if (!roomGroups[stat.roomCode]) {
@@ -52,7 +62,7 @@ async function updateLeaderboardData() {
         curr.bestSolve < best.bestSolve ? curr : best
       );
       pointsToAward[bestSolveWinner.playerName] =
-        (pointsToAward[bestSolveWinner.playerName] || 0) + 4;
+        (pointsToAward[bestSolveWinner.playerName] || 0) + BEST_SOLVE_POINTS;
     }
 
     if (validAo5Stats.length > 0) {
@@ -60,7 +70,7 @@ async function updateLeaderboardData() {
         curr.ao5 < best.ao5 ? curr : best
       );
       pointsToAward[bestAo5Winner.playerName] =
-        (pointsToAward[bestAo5Winner.playerName] || 0) + 3;
+        (pointsToAward[bestAo5Winner.playerName] || 0) + BEST_AO5_POINTS;
     }
 
     if (validAo12Stats.length > 0) {
@@ -68,7 +78,7 @@ async function updateLeaderboardData() {
         curr.ao12 < best.ao12 ? curr : best
       );
       pointsToAward[bestAo12Winner.playerName] =
-        (pointsToAward[bestAo12Winner.playerName] || 0) + 3;
+        (pointsToAward[bestAo12Winner.playerName] || 0) + BEST_AO12_POINTS;
     }
 
     // Award points and update stats
@@ -85,9 +95,7 @@ async function updateLeaderboardData() {
           roomCode_playerName_weekStart: { roomCode, playerName, weekStart },
         },
         update: {
-          weeklyPoints: {
-            increment: points,
-          },
+          weeklyPoints: { increment: points },
         },
         create: {
           roomCode,
@@ -106,9 +114,7 @@ async function updateLeaderboardData() {
             lt: endOfDay,
           },
         },
-        data: {
-          dailyPoints: points,
-        },
+        data: { dailyPoints: points },
       });
 
       if (points > 0) {
@@ -121,77 +127,73 @@ async function updateLeaderboardData() {
         );
       }
     }
-
-    // Handle weekly bests only if valid winners exist
-    const currentWeeklyBest = await prisma.weeklyBestStats.findUnique({
-      where: {
-        roomCode_weekStart: { roomCode, weekStart },
-      },
-    });
-
-    const weeklyUpdates = {};
-
-    if (
-      bestAo5Winner &&
-      (!currentWeeklyBest ||
-        !currentWeeklyBest.bestAo5 ||
-        bestAo5Winner.ao5 < currentWeeklyBest.bestAo5)
-    ) {
-      weeklyUpdates.bestAo5 = bestAo5Winner.ao5;
-      weeklyUpdates.bestAo5PlayerName = bestAo5Winner.playerName;
-    }
-
-    if (
-      bestAo12Winner &&
-      (!currentWeeklyBest ||
-        !currentWeeklyBest.bestAo12 ||
-        bestAo12Winner.ao12 < currentWeeklyBest.bestAo12)
-    ) {
-      weeklyUpdates.bestAo12 = bestAo12Winner.ao12;
-      weeklyUpdates.bestAo12PlayerName = bestAo12Winner.playerName;
-    }
-
-    if (
-      bestSolveWinner &&
-      (!currentWeeklyBest ||
-        !currentWeeklyBest.bestSolve ||
-        bestSolveWinner.bestSolve < currentWeeklyBest.bestSolve)
-    ) {
-      weeklyUpdates.bestSolve = bestSolveWinner.bestSolve;
-      weeklyUpdates.bestSolvePlayerName = bestSolveWinner.playerName;
-    }
-
-    if (Object.keys(weeklyUpdates).length > 0) {
-      await prisma.weeklyBestStats.upsert({
-        where: {
-          roomCode_weekStart: { roomCode, weekStart },
-        },
-        update: weeklyUpdates,
-        create: {
-          roomCode,
-          weekStart,
-          bestAo5: bestAo5Winner?.ao5 ?? null,
-          bestAo5PlayerName: bestAo5Winner?.playerName ?? null,
-          bestAo12: bestAo12Winner?.ao12 ?? null,
-          bestAo12PlayerName: bestAo12Winner?.playerName ?? null,
-          bestSolve: bestSolveWinner?.bestSolve ?? null,
-          bestSolvePlayerName: bestSolveWinner?.playerName ?? null,
-        },
-      });
-
-      console.log(
-        `Updated weekly records for room ${roomCode}:`,
-        weeklyUpdates
-      );
-    }
   }
 }
 
-// weekly cron job for pruning of data, i think i can prune everything before the previous week
+/**
+ * Update weekly best Ao5, Ao12, and Solve stats
+ */
+async function updateWeeklyBestStats(yesterdayStats, startOfDay) {
+  const weekStart = getWeekStart(startOfDay);
 
-// daily leaderboard updating to run everyday at 12:01am UTC
-// cron.schedule("1 0 * * *", updateLeaderboardData, {
-//   timezone: "UTC",
-// });
+  for (const stat of yesterdayStats) {
+    const currentBest = await prisma.weeklyBestStats.findUnique({
+      where: {
+        roomCode_weekStart_playerName: {
+          roomCode: stat.roomCode,
+          weekStart,
+          playerName: stat.playerName,
+        },
+      },
+    });
+
+    const curBestAo5 =
+      currentBest?.bestAo5 == null ||
+      (stat.ao5 != null && stat.ao5 < currentBest.bestAo5)
+        ? stat.ao5
+        : currentBest?.bestAo5;
+
+    const curBestAo12 =
+      currentBest?.bestAo12 == null ||
+      (stat.ao12 != null && stat.ao12 < currentBest.bestAo12)
+        ? stat.ao12
+        : currentBest?.bestAo12;
+
+    const curBestSolve =
+      currentBest?.bestSolve == null ||
+      (stat.bestSolve != null && stat.bestSolve < currentBest.bestSolve)
+        ? stat.bestSolve
+        : currentBest?.bestSolve;
+
+    const weeklyUpdates = {
+      bestAo5: curBestAo5,
+      bestAo12: curBestAo12,
+      bestSolve: curBestSolve,
+    };
+
+    await prisma.weeklyBestStats.upsert({
+      where: {
+        roomCode_weekStart_playerName: {
+          roomCode: stat.roomCode,
+          weekStart,
+          playerName: stat.playerName,
+        },
+      },
+      update: weeklyUpdates,
+      create: {
+        roomCode: stat.roomCode,
+        weekStart,
+        playerName: stat.playerName,
+        bestAo5: curBestAo5,
+        bestAo12: curBestAo12,
+        bestSolve: curBestSolve,
+      },
+    });
+    console.log(
+      `Updated weekly records for room ${stat.roomCode}, player ${stat.playerName}`,
+      weeklyUpdates
+    );
+  }
+}
 
 export { updateLeaderboardData };

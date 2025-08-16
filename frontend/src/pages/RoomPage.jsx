@@ -6,7 +6,6 @@ import {
   getDailyLeaderboard,
   getTodayStats,
   getWeeklyLeaderboard,
-  getWeeklyBestStats,
   updatePlayerDetails,
 } from "../services/api";
 import {
@@ -20,8 +19,6 @@ import {
   getDailyLeaderboardFromStorage,
   saveWeeklyLeaderboardToStorage,
   getWeeklyLeaderboardFromStorage,
-  saveWeeklyBestStatsToStorage,
-  getWeeklyBestStatsFromStorage,
   getSubmissionStatusFromStorage,
   saveSubmissionStatusToStorage,
 } from "../services/storage";
@@ -35,6 +32,7 @@ import { useIsMobile } from "../services/hooks/useIsMobile";
 import { useAuth } from "../services/hooks/useAuth";
 import { useRoomParticipants } from "../services/hooks/useRoomParticipants";
 import RoomParticipantsModals from "../components/RoomParticipantsModal";
+import WeeklyBestStatsTable from "../components/WeeklyBestStatsTable";
 
 function RoomPage() {
   const { roomCode } = useParams();
@@ -74,15 +72,13 @@ function RoomPage() {
   const [weeklyLeaderboardData, setWeeklyLeaderboardData] = useState([]);
   const [isLoadingWeeklyLeaderboard, setIsLoadingWeeklyLeaderboard] =
     useState(false);
-  const [weeklyBestStats, setWeeklyBestStats] = useState(null);
-  const [isLoadingWeeklyBestStats, setIsLoadingWeeklyBestStats] =
-    useState(false);
   const [allWeeklyLeaderboardData, setAllWeeklyLeaderboardData] = useState([]);
-  const [allWeeklyBestStats, setAllWeeklyBestStats] = useState([]);
-  const [showWeeklyHistory, setShowWeeklyHistory] = useState(false);
   const [isNewWeek, setIsNewWeek] = useState(false);
   const [previousWeekLeaderboardData, setPreviousWeekLeaderboardData] =
     useState([]);
+  const [currentWeekStats, setCurrentWeekStats] = useState(null);
+  const [showWeeklyStatsModal, setShowWeeklyStatsModal] = useState(false);
+  const weeklyStatsTableRef = useRef(null);
 
   // Timer states
   const [activeScramble, setActiveScramble] = useState(null);
@@ -260,43 +256,8 @@ function RoomPage() {
     }
   };
 
-  const fetchWeeklyBestStats = async () => {
-    if (!roomCode) return;
-
-    setIsLoadingWeeklyBestStats(true);
-    try {
-      const response = await getWeeklyBestStats(roomCode);
-      setAllWeeklyBestStats(response || []);
-
-      // Filter for current week
-      const currentWeekStart = getWeekStart(new Date());
-      const currentWeekStats = (response || []).find(
-        (item) =>
-          new Date(item.weekStart).getTime() === currentWeekStart.getTime()
-      );
-      setWeeklyBestStats(currentWeekStats || null);
-
-      // Save to local storage
-      saveWeeklyBestStatsToStorage(roomCode, response || []);
-    } catch (error) {
-      console.error("Failed to fetch weekly best stats:", error);
-
-      // Try to load from local storage as fallback
-      const storedStats = getWeeklyBestStatsFromStorage(roomCode);
-      if (storedStats !== null && storedStats !== undefined) {
-        setAllWeeklyBestStats(storedStats);
-
-        // Filter for current week
-        const currentWeekStart = getWeekStart(new Date());
-        const currentWeekStats = storedStats.find(
-          (item) =>
-            new Date(item.weekStart).getTime() === currentWeekStart.getTime()
-        );
-        setWeeklyBestStats(currentWeekStats || null);
-      }
-    } finally {
-      setIsLoadingWeeklyBestStats(false);
-    }
+  const handleStatsUpdate = (currentStats) => {
+    setCurrentWeekStats(currentStats);
   };
 
   const fetchAllData = async () => {
@@ -304,61 +265,15 @@ function RoomPage() {
     fetchTodayStats();
     fetchDailyLeaderboard();
     fetchWeeklyLeaderboard();
-    fetchWeeklyBestStats();
   };
 
-  const generateWeeklyHistory = () => {
-    // Get all unique weeks from both datasets
-    const allWeeks = new Set();
-
-    allWeeklyLeaderboardData.forEach((item) => {
-      allWeeks.add(item.weekStart);
-    });
-
-    allWeeklyBestStats.forEach((item) => {
-      allWeeks.add(item.weekStart);
-    });
-
-    // Convert to sorted array (most recent first)
-    const sortedWeeks = Array.from(allWeeks).sort(
-      (a, b) => new Date(b) - new Date(a)
-    );
-
-    // Filter out current week for history
-    const currentWeekStart = getWeekStart(new Date());
-    const historicalWeeks = sortedWeeks.filter(
-      (weekStart) =>
-        new Date(weekStart).getTime() !== currentWeekStart.getTime()
-    );
-
-    return historicalWeeks.map((weekStart) => {
-      // Find winner for this week (highest weekly points)
-      const weekLeaderboard = allWeeklyLeaderboardData
-        .filter((item) => item.weekStart === weekStart)
-        .sort((a, b) => b.weeklyPoints - a.weeklyPoints);
-
-      const winner = weekLeaderboard[0] || null;
-
-      // Find best stats for this week
-      const weekBestStats = allWeeklyBestStats.find(
-        (item) => item.weekStart === weekStart
-      );
-
-      return {
-        weekStart,
-        winner,
-        bestAo5: weekBestStats?.bestAo5 || null,
-        bestAo5PlayerName: weekBestStats?.bestAo5PlayerName || null,
-        bestAo12: weekBestStats?.bestAo12 || null,
-        bestAo12PlayerName: weekBestStats?.bestAo12PlayerName || null,
-        bestSolve: weekBestStats?.bestSolve || null,
-        bestSolvePlayerName: weekBestStats?.bestSolvePlayerName || null,
-      };
-    });
-  };
-
-  const handleShowWeeklyHistory = () => {
-    setShowWeeklyHistory(true);
+  // Method to refresh both leaderboard and stats
+  const refreshAllWeeklyData = () => {
+    fetchWeeklyLeaderboard();
+    // Trigger refresh in the WeeklyBestStatsTable component
+    if (weeklyStatsTableRef.current) {
+      weeklyStatsTableRef.current.refresh();
+    }
   };
 
   useEffect(() => {
@@ -674,7 +589,7 @@ function RoomPage() {
       const scrollY = window.scrollY || document.documentElement.scrollTop;
       const touchDeltaY = touchY - touchStartY;
       const touchDuration = Date.now() - touchStartTime;
-      
+
       // Prevent pull-to-refresh when modal is active and:
       // 1. At the top of the page (scrollY <= 5 for some tolerance)
       // 2. Pulling down (touchDeltaY > 5)
@@ -683,7 +598,7 @@ function RoomPage() {
       if (scrollY <= 5 && touchDeltaY > 5) {
         e.preventDefault();
       }
-      
+
       // Also prevent if user is holding space/timer and dragging
       if ((isHoldingSpace || isTimerActive) && touchDeltaY > 0) {
         e.preventDefault();
@@ -691,7 +606,9 @@ function RoomPage() {
     };
 
     // Use non-passive listeners for both to enable preventDefault
-    document.addEventListener("touchstart", handleTouchStart, { passive: false });
+    document.addEventListener("touchstart", handleTouchStart, {
+      passive: false,
+    });
     document.addEventListener("touchmove", handleTouchMove, { passive: false });
 
     return () => {
@@ -699,7 +616,7 @@ function RoomPage() {
       document.removeEventListener("touchmove", handleTouchMove);
     };
   }, [activeScramble, isHoldingSpace, isTimerActive]);
-  
+
   // Global mobile touch-to-stop effect
   useEffect(() => {
     function handleGlobalTouchEnd(event) {
@@ -1192,7 +1109,7 @@ function RoomPage() {
               🏆 Daily Leaderboard
             </button>
             <button
-              onClick={handleShowWeeklyHistory}
+              onClick={() => setShowWeeklyStatsModal(true)}
               className="bg-purple-500 hover:bg-purple-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
             >
               📊 Weekly History
@@ -1665,52 +1582,45 @@ function RoomPage() {
                   Weekly Leaderboard
                 </h3>
                 <button
-                  onClick={() => {
-                    fetchWeeklyLeaderboard();
-                    fetchWeeklyBestStats();
-                  }}
+                  onClick={refreshAllWeeklyData}
                   className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                  disabled={
-                    isLoadingWeeklyLeaderboard || isLoadingWeeklyBestStats
-                  }
+                  disabled={isLoadingWeeklyLeaderboard}
                 >
-                  {isLoadingWeeklyLeaderboard || isLoadingWeeklyBestStats
-                    ? "..."
-                    : "🔄"}
+                  {isLoadingWeeklyLeaderboard ? "..." : <span className="text-2xl">🔄</span>}
                 </button>
               </div>
 
               {/* Weekly Best Stats */}
-              {weeklyBestStats && (
+              {currentWeekStats && currentWeekStats.summary && (
                 <div className="mb-6 p-4 bg-gray-50 rounded-lg">
                   <h4 className="font-semibold text-gray-700 mb-3 text-sm">
                     This Week's Best
                   </h4>
                   <div className="space-y-2 text-sm">
-                    {weeklyBestStats.bestAo5 && (
+                    {currentWeekStats.summary.bestAo5 && (
                       <div className="flex justify-between">
                         <span className="text-gray-600">Best AO5:</span>
                         <span className="font-mono text-blue-600">
-                          {formatTime(weeklyBestStats.bestAo5)}s (
-                          {weeklyBestStats.bestAo5PlayerName})
+                          {formatTime(currentWeekStats.summary.bestAo5.solveTime)}s
+                          ({currentWeekStats.summary.bestAo5.playerName})
                         </span>
                       </div>
                     )}
-                    {weeklyBestStats.bestAo12 && (
+                    {currentWeekStats.summary.bestAo12 && (
                       <div className="flex justify-between">
                         <span className="text-gray-600">Best AO12:</span>
                         <span className="font-mono text-purple-600">
-                          {formatTime(weeklyBestStats.bestAo12)}s (
-                          {weeklyBestStats.bestAo12PlayerName})
+                          {formatTime(currentWeekStats.summary.bestAo12.solveTime)}s
+                          ({currentWeekStats.summary.bestAo12.playerName})
                         </span>
                       </div>
                     )}
-                    {weeklyBestStats.bestSolve && (
+                    {currentWeekStats.summary.bestSolve && (
                       <div className="flex justify-between">
                         <span className="text-gray-600">Best Solve:</span>
                         <span className="font-mono text-green-600">
-                          {formatTime(weeklyBestStats.bestSolve)}s (
-                          {weeklyBestStats.bestSolvePlayerName})
+                          {formatTime(currentWeekStats.summary.bestSolve.solveTime)}
+                          s ({currentWeekStats.summary.bestSolve.playerName})
                         </span>
                       </div>
                     )}
@@ -1781,101 +1691,39 @@ function RoomPage() {
         )}
       </div>
 
-      {/* Weekly History Modal */}
-      {showWeeklyHistory && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
+      {/* Weekly Stats Modal */}
+      {showWeeklyStatsModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-7xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <h3 className="text-xl font-semibold text-gray-800">
-                Weekly History
+                Weekly Best Stats
               </h3>
-              <button
-                onClick={() => setShowWeeklyHistory(false)}
-                className="text-gray-500 hover:text-gray-700 text-xl font-bold"
-              >
-                ×
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={refreshAllWeeklyData}
+                  className="text-blue-600 hover:text-blue-800 text-sm font-medium px-3 py-1 rounded hover:bg-blue-50 transition-colors"
+                  disabled={isLoading}
+                >
+                  {isLoading ? "..." : <span className="text-2xl">🔄</span>}
+                </button>
+                <button
+                  onClick={() => setShowWeeklyStatsModal(false)}
+                  className="text-gray-500 hover:text-gray-700 text-xl font-bold w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100"
+                >
+                  ×
+                </button>
+              </div>
             </div>
-
-            {generateWeeklyHistory().length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse border border-gray-200">
-                  <thead>
-                    <tr className="bg-gray-50">
-                      <th className="border border-gray-200 px-4 py-2 text-left">
-                        Week Start
-                      </th>
-                      <th className="border border-gray-200 px-4 py-2 text-left">
-                        Winner
-                      </th>
-                      <th className="border border-gray-200 px-4 py-2 text-left">
-                        Best AO5
-                      </th>
-                      <th className="border border-gray-200 px-4 py-2 text-left">
-                        Best AO12
-                      </th>
-                      <th className="border border-gray-200 px-4 py-2 text-left">
-                        Best Solve
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {generateWeeklyHistory().map((week, index) => (
-                      <tr key={index} className="hover:bg-gray-50">
-                        <td className="border border-gray-200 px-4 py-2">
-                          {new Date(week.weekStart).toLocaleDateString()}
-                        </td>
-                        <td className="border border-gray-200 px-4 py-2">
-                          {week.winner ? (
-                            <span>
-                              {week.winner.playerName} (
-                              {week.winner.weeklyPoints} pts)
-                            </span>
-                          ) : (
-                            "-"
-                          )}
-                        </td>
-                        <td className="border border-gray-200 px-4 py-2">
-                          {week.bestAo5 ? (
-                            <span className="font-mono text-blue-600">
-                              {formatTime(week.bestAo5)}s (
-                              {week.bestAo5PlayerName})
-                            </span>
-                          ) : (
-                            "-"
-                          )}
-                        </td>
-                        <td className="border border-gray-200 px-4 py-2">
-                          {week.bestAo12 ? (
-                            <span className="font-mono text-purple-600">
-                              {formatTime(week.bestAo12)}s (
-                              {week.bestAo12PlayerName})
-                            </span>
-                          ) : (
-                            "-"
-                          )}
-                        </td>
-                        <td className="border border-gray-200 px-4 py-2">
-                          {week.bestSolve ? (
-                            <span className="font-mono text-green-600">
-                              {formatTime(week.bestSolve)}s (
-                              {week.bestSolvePlayerName})
-                            </span>
-                          ) : (
-                            "-"
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                <div className="text-4xl mb-4">📊</div>
-                <p>No weekly history available yet.</p>
-              </div>
-            )}
+            <div className="flex-1 overflow-y-auto p-6">
+              <WeeklyBestStatsTable
+                ref={weeklyStatsTableRef}
+                roomCode={roomCode}
+                formatTime={formatTime}
+                getWeekStart={getWeekStart}
+                onStatsUpdate={handleStatsUpdate}
+              />
+            </div>
           </div>
         </div>
       )}

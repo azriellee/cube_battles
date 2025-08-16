@@ -944,6 +944,11 @@ function RoomPage() {
           {/* Touch-enabled timer area */}
           <div
             className="mb-8 select-none"
+            style={{
+              WebkitUserSelect: "none",
+              userSelect: "none",
+              WebkitTouchCallout: "none", // ← blocks the Samsung long-press menu
+            }}
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
           >
@@ -1586,7 +1591,11 @@ function RoomPage() {
                   className="text-blue-600 hover:text-blue-800 text-sm font-medium"
                   disabled={isLoadingWeeklyLeaderboard}
                 >
-                  {isLoadingWeeklyLeaderboard ? "..." : <span className="text-2xl">🔄</span>}
+                  {isLoadingWeeklyLeaderboard ? (
+                    "..."
+                  ) : (
+                    <span className="text-2xl">🔄</span>
+                  )}
                 </button>
               </div>
 
@@ -1601,8 +1610,10 @@ function RoomPage() {
                       <div className="flex justify-between">
                         <span className="text-gray-600">Best AO5:</span>
                         <span className="font-mono text-blue-600">
-                          {formatTime(currentWeekStats.summary.bestAo5.solveTime)}s
-                          ({currentWeekStats.summary.bestAo5.playerName})
+                          {formatTime(
+                            currentWeekStats.summary.bestAo5.solveTime
+                          )}
+                          s ({currentWeekStats.summary.bestAo5.playerName})
                         </span>
                       </div>
                     )}
@@ -1610,8 +1621,10 @@ function RoomPage() {
                       <div className="flex justify-between">
                         <span className="text-gray-600">Best AO12:</span>
                         <span className="font-mono text-purple-600">
-                          {formatTime(currentWeekStats.summary.bestAo12.solveTime)}s
-                          ({currentWeekStats.summary.bestAo12.playerName})
+                          {formatTime(
+                            currentWeekStats.summary.bestAo12.solveTime
+                          )}
+                          s ({currentWeekStats.summary.bestAo12.playerName})
                         </span>
                       </div>
                     )}
@@ -1619,7 +1632,9 @@ function RoomPage() {
                       <div className="flex justify-between">
                         <span className="text-gray-600">Best Solve:</span>
                         <span className="font-mono text-green-600">
-                          {formatTime(currentWeekStats.summary.bestSolve.solveTime)}
+                          {formatTime(
+                            currentWeekStats.summary.bestSolve.solveTime
+                          )}
                           s ({currentWeekStats.summary.bestSolve.playerName})
                         </span>
                       </div>

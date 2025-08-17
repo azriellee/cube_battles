@@ -1762,49 +1762,52 @@ function RoomPage() {
             <div className="flex justify-end mb-2">
               <button
                 onClick={() => {
-                  fetchWeeklyLeaderboard();
-                  fetchWeeklyBestStats();
+                  refreshAllWeeklyData();
                 }}
                 className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                disabled={
-                  isLoadingWeeklyLeaderboard || isLoadingWeeklyBestStats
-                }
+                disabled={isLoadingWeeklyLeaderboard}
               >
-                {isLoadingWeeklyLeaderboard || isLoadingWeeklyBestStats
-                  ? "..."
-                  : "🔄"}
+                {isLoadingWeeklyLeaderboard ? (
+                  "..."
+                ) : (
+                  <span className="text-2xl">🔄</span>
+                )}
               </button>
             </div>
-            {weeklyBestStats && (
+            {currentWeekStats && currentWeekStats.summary && (
               <div className="mb-6 p-4 bg-gray-50 rounded-lg">
                 <h4 className="font-semibold text-gray-700 mb-3 text-sm">
                   This Week's Best
                 </h4>
                 <div className="space-y-2 text-sm">
-                  {weeklyBestStats.bestAo5 && (
+                  {currentWeekStats.summary.bestAo5 && (
                     <div className="flex justify-between">
                       <span className="text-gray-600">Best AO5:</span>
                       <span className="font-mono text-blue-600">
-                        {formatTime(weeklyBestStats.bestAo5)}s (
-                        {weeklyBestStats.bestAo5PlayerName})
+                        {formatTime(currentWeekStats.summary.bestAo5.solveTime)}
+                        s ({currentWeekStats.summary.bestAo5.playerName})
                       </span>
                     </div>
                   )}
-                  {weeklyBestStats.bestAo12 && (
+                  {currentWeekStats.summary.bestAo12 && (
                     <div className="flex justify-between">
                       <span className="text-gray-600">Best AO12:</span>
                       <span className="font-mono text-purple-600">
-                        {formatTime(weeklyBestStats.bestAo12)}s (
-                        {weeklyBestStats.bestAo12PlayerName})
+                        {formatTime(
+                          currentWeekStats.summary.bestAo12.solveTime
+                        )}
+                        s ({currentWeekStats.summary.bestAo12.playerName})
                       </span>
                     </div>
                   )}
-                  {weeklyBestStats.bestSolve && (
+                  {currentWeekStats.summary.bestSolve && (
                     <div className="flex justify-between">
                       <span className="text-gray-600">Best Solve:</span>
                       <span className="font-mono text-green-600">
-                        {formatTime(weeklyBestStats.bestSolve)}s (
-                        {weeklyBestStats.bestSolvePlayerName})
+                        {formatTime(
+                          currentWeekStats.summary.bestSolve.solveTime
+                        )}
+                        s ({currentWeekStats.summary.bestSolve.playerName})
                       </span>
                     </div>
                   )}

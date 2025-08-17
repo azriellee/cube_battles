@@ -33,12 +33,6 @@ export const calculateAverage = (solveTimes, count) => {
     .map((time) => parseFloat(time))
     .filter((time) => !isNaN(time));
 
-  // If count == number of valid times, return average of all solves
-  if (validTimes.length === count) {
-    const sum = validTimes.reduce((a, b) => a + b, 0);
-    return (sum / validTimes.length).toFixed(2);
-  }
-
   // Sort valid times
   const sortedTimes = [...validTimes].sort((a, b) => a - b);
 
@@ -59,6 +53,22 @@ export const calculateAverage = (solveTimes, count) => {
   const average = sum / sortedTimes.length;
 
   return average.toFixed(2);
+};
+
+// This function would be used to calculate total average for prac rooms, this assumes there are no dnfs in the solves for now
+export const calculateTotalAverage = (solveTimes) => {
+  if (Object.keys(solveTimes).length === 0) {
+    return null;
+  }
+
+  // Get valid times (non-DNF)
+  const validTimes = Object.values(solveTimes)
+    .map((solve) => solve.time)
+    .map((time) => parseFloat(time))
+    .filter((time) => !isNaN(time));
+
+  const sum = validTimes.reduce((a, b) => a + b, 0);
+  return (sum / validTimes.length).toFixed(2);
 };
 
 export const getBestSingle = (solveTimes) => {

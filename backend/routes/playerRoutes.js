@@ -48,7 +48,6 @@ router.get("/get-player/:playerName", async (req, res) => {
         : null;
 
     const response = {
-      id: player.id,
       playerName: player.playerName,
       email: player.email,
       dateJoined: player.dateJoined,

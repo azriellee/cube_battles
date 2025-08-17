@@ -7,6 +7,7 @@ import {
 import {
   formatTime,
   calculateAverage,
+  calculateTotalAverage,
   getBestSingle,
 } from "../services/metrics";
 import { getScramble } from "../services/scramble";
@@ -282,10 +283,7 @@ function PracticeModePage() {
   const bestSingle = getBestSingle(solveTimes);
   const currentAo5 = calculateAverage(solveTimes, 5);
   const currentAo12 = calculateAverage(solveTimes, 12);
-  const currentAverage = calculateAverage(
-    solveTimes,
-    Object.keys(solveTimes).length
-  );
+  const currentAverage = calculateTotalAverage(solveTimes);
 
   // Prepare table data
   const tableData = Object.entries(solveTimes)

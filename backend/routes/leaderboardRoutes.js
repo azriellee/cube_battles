@@ -49,17 +49,89 @@ router.get("/weekly-leaderboard/:roomCode", async (req, res) => {
   }
 });
 
-// Get weekly best stats for a room
+// Get weekly best stats for a room with summaries + full details
 router.get("/weekly-best-stats/:roomCode", async (req, res) => {
   try {
     const { roomCode } = req.params;
 
-    const bestStats = await prisma.weeklyBestStats.findMany({
+    // 1️⃣ Get all WeeklyBestStats rows for this room
+    const bestStatsRows = await prisma.weeklyBestStats.findMany({
       where: { roomCode },
       orderBy: { weekStart: "desc" },
     });
 
-    res.json(bestStats);
+    // 2️⃣ Get all WeeklyLeaderboard rows for this room (for winners)
+    const leaderboardRows = await prisma.weeklyLeaderboard.findMany({
+      where: { roomCode },
+    });
+
+    // 3️⃣ Group WeeklyBestStats by weekStart
+    const groupedByWeek = bestStatsRows.reduce((acc, row) => {
+      const weekKey = row.weekStart.toISOString();
+
+      if (!acc[weekKey]) {
+        acc[weekKey] = { weekStart: row.weekStart, players: [] };
+      }
+      acc[weekKey].players.push(row);
+
+      return acc;
+    }, {});
+
+    // 4️⃣ Build final array with summaries
+    const result = Object.values(groupedByWeek).map((weekData) => {
+      const { weekStart, players } = weekData;
+
+      // Get winner from leaderboard
+      const leaderboardForWeek = leaderboardRows.filter(
+        (lb) => lb.weekStart.getTime() === weekStart.getTime()
+      );
+      const winnerEntry = leaderboardForWeek.reduce((best, curr) =>
+        curr.weeklyPoints > (best?.weeklyPoints ?? -Infinity) ? curr : best,
+        null
+      );
+
+      // Find best Ao5, Ao12, bestSolve from players
+      const bestAo5Entry = players.reduce((best, curr) =>
+        curr.bestAo5 !== null && curr.bestAo5 < (best?.bestAo5 ?? Infinity) ? curr : best,
+        null
+      );
+      const bestAo12Entry = players.reduce((best, curr) =>
+        curr.bestAo12 !== null && curr.bestAo12 < (best?.bestAo12 ?? Infinity) ? curr : best,
+        null
+      );
+      const bestSolveEntry = players.reduce((best, curr) =>
+        curr.bestSolve !== null && curr.bestSolve < (best?.bestSolve ?? Infinity) ? curr : best,
+        null
+      );
+
+      return {
+        weekStart,
+        summary: {
+          winner: winnerEntry
+            ? { playerName: winnerEntry.playerName, points: winnerEntry.weeklyPoints }
+            : null,
+          bestAo5: bestAo5Entry
+            ? { playerName: bestAo5Entry.playerName, solveTime: bestAo5Entry.bestAo5 }
+            : null,
+          bestAo12: bestAo12Entry
+            ? { playerName: bestAo12Entry.playerName, solveTime: bestAo12Entry.bestAo12 }
+            : null,
+          bestSolve: bestSolveEntry
+            ? { playerName: bestSolveEntry.playerName, solveTime: bestSolveEntry.bestSolve }
+            : null,
+        },
+        players: players.map((p) => ({
+          playerName: p.playerName,
+          bestAo5: p.bestAo5,
+          bestAo12: p.bestAo12,
+          bestSolve: p.bestSolve,
+          // optional: include points for detail view
+          points: leaderboardForWeek.find((lb) => lb.playerName === p.playerName)?.weeklyPoints ?? 0,
+        })),
+      };
+    });
+
+    res.json(result);
   } catch (error) {
     console.error("Error fetching best stats:", error);
     res.status(500).json({ error: "Failed to fetch best stats" });

@@ -18,8 +18,7 @@ model Room {
 }
 
 model Player {
-  id          String   @id @default(cuid())
-  playerName  String   @unique
+  playerName  String   @id
   email       String   @unique
   dateJoined  DateTime @default(now())
   numSolves   Int      @default(0)
@@ -65,16 +64,14 @@ model WeeklyLeaderboard {
   @@id([roomCode, playerName, weekStart])
 }
 
-// These represent the BEST times achieved by ANY player in the room during the week
+// These represent the BEST times achieved by each player in the room during the week
 model WeeklyBestStats {
   roomCode            String
   weekStart           DateTime 
+  playerName          String
   bestAo5             Float?
-  bestAo5PlayerName   String?
   bestAo12            Float?
-  bestAo12PlayerName  String?
   bestSolve           Float?
-  bestSolvePlayerName String?
 
-  @@id([roomCode, weekStart])
+  @@id([roomCode, weekStart, playerName])
 }

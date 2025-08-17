@@ -267,25 +267,4 @@ router.post("/updateStatistics", async (req, res) => {
   }
 });
 
-// List all rooms (optional - for debugging/admin)
-router.get("/", async (req, res) => {
-  try {
-    const rooms = await prisma.room.findMany({
-      orderBy: { code: "asc" },
-    });
-
-    res.json({
-      success: true,
-      rooms: rooms.map((room) => ({ code: room.code })),
-      count: rooms.length,
-    });
-  } catch (error) {
-    console.error("Error fetching rooms:", error);
-    res.status(500).json({
-      error: "Failed to fetch rooms",
-      details: error.message,
-    });
-  }
-});
-
 export default router;

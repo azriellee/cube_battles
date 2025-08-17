@@ -230,6 +230,12 @@ const RoomParticipantsModals = ({
                   {selectedPlayerDetails.playerName}
                 </p>
                 <p>
+                  <span className="text-gray-700">Average:</span>{" "}
+                  {selectedPlayerDetails.averageTime
+                    ? `${selectedPlayerDetails.averageTime}s`
+                    : "N/A"}
+                </p>
+                <p>
                   <span className="text-gray-700">Best Solve:</span>{" "}
                   {selectedPlayerDetails.bestSolve
                     ? `${selectedPlayerDetails.bestSolve}s`
@@ -237,18 +243,22 @@ const RoomParticipantsModals = ({
                 </p>
                 <p>
                   <span className="text-gray-700">Best Ao5:</span>{" "}
-                  {selectedPlayerDetails.bestAo5 ?? "N/A"}
+                  {selectedPlayerDetails.bestAo5
+                    ? `${selectedPlayerDetails.bestAo5}s`
+                    : "N/A"}
                 </p>
                 <p>
                   <span className="text-gray-700">Best Ao12:</span>{" "}
-                  {selectedPlayerDetails.bestAo12 ?? "N/A"}
+                  {selectedPlayerDetails.bestAo12
+                    ? `${selectedPlayerDetails.bestAo12}s`
+                    : "N/A"}
                 </p>
                 <p>
                   <span className="text-gray-700">Total Solves:</span>{" "}
                   {selectedPlayerDetails.numSolves ?? 0}
                 </p>
                 <p>
-                <span className="text-gray-700">Total Solves:</span>{" "}
+                  <span className="text-gray-700">Date Joined:</span>{" "}
                   {formatDate(selectedPlayerDetails.dateJoined) ?? 0}
                 </p>
               </div>

@@ -1,14 +1,11 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Trash2, Eye, RotateCcw } from "lucide-react";
 import {
   savePracticeTimesToStorage,
   loadPracticeTimesFromStorage,
 } from "../services/storage";
 import {
-  formatTime,
-  calculateAverage,
-  calculateTotalAverage,
-  getBestSingle,
+  formatTime
 } from "../services/metrics";
 import { getScramble } from "../services/scramble";
 import { useNavigate } from "react-router-dom";
@@ -259,43 +256,94 @@ function PracticeModePage() {
   };
 
   // Calculate statistics for each solve
-  const calculateStatsForSolve = (solveId) => {
-    const solveIds = Object.keys(solveTimes).sort(
-      (a, b) => solveTimes[a].timestamp - solveTimes[b].timestamp
-    );
-    const solveIndex = solveIds.indexOf(solveId);
+  // const calculateStatsForSolve = (solveId) => {
+  //   const solveIds = Object.keys(solveTimes).sort(
+  //     (a, b) => solveTimes[a].timestamp - solveTimes[b].timestamp
+  //   );
+  //   const solveIndex = solveIds.indexOf(solveId);
 
-    if (solveIndex === -1) return { ao5: null, ao12: null };
+  //   if (solveIndex === -1) return { ao5: null, ao12: null };
 
-    // Get solves up to this point (inclusive)
-    const solvesUpToHere = {};
-    for (let i = 0; i <= solveIndex; i++) {
-      solvesUpToHere[solveIds[i]] = solveTimes[solveIds[i]];
-    }
+  //   // Get solves up to this point (inclusive)
+  //   const solvesUpToHere = {};
+  //   for (let i = 0; i <= solveIndex; i++) {
+  //     solvesUpToHere[solveIds[i]] = solveTimes[solveIds[i]];
+  //   }
 
-    return {
-      ao5: calculateAverage(solvesUpToHere, 5),
-      ao12: calculateAverage(solvesUpToHere, 12),
-    };
-  };
+  //   return {
+  //     ao5: calculateAverage(solvesUpToHere, 5),
+  //     ao12: calculateAverage(solvesUpToHere, 12),
+  //   };
+  // };
 
   // Get current statistics
-  const bestSingle = getBestSingle(solveTimes);
-  const currentAo5 = calculateAverage(solveTimes, 5);
-  const currentAo12 = calculateAverage(solveTimes, 12);
-  const currentAverage = calculateTotalAverage(solveTimes);
+  // const bestSingle = getBestSingle(solveTimes);
+  // const currentAo5 = calculateAverage(solveTimes, 5);
+  // const currentAo12 = calculateAverage(solveTimes, 12);
+  // const currentAverage = calculateTotalAverage(solveTimes);
 
-  // Prepare table data
-  const tableData = Object.entries(solveTimes)
-    .sort(([, a], [, b]) => b.timestamp - a.timestamp)
-    .map(([id, solve]) => {
-      const stats = calculateStatsForSolve(id);
+  // // Prepare table data
+  // const tableData = Object.entries(solveTimes)
+  //   .sort(([, a], [, b]) => b.timestamp - a.timestamp)
+  //   .map(([id, solve]) => {
+  //     const stats = calculateStatsForSolve(id);
+  //     return {
+  //       id,
+  //       ...solve,
+  //       ...stats,
+  //     };
+  //   });
+
+  const { bestSingle, currentAo5, currentAo12, currentAverage, tableData } =
+  useMemo(() => {
+    // 1) get solves once, in timestamp order
+    const entriesAsc = Object.entries(solveTimes)
+      .sort(([, a], [, b]) => a.timestamp - b.timestamp);
+
+    // 2) one pass: compute rolling Ao5/Ao12 so we avoid O(n²)
+    const ao5Window = [];
+    const ao12Window = [];
+    const pushAndTrim = (arr, v, max) => { arr.push(v); if (arr.length > max) arr.shift(); };
+
+    // helper to compute trimmed mean (drop fastest/slowest) for WCA-like aoN
+    const trimmedAvg = (arr) => {
+      if (!arr || arr.length < 3) return null;
+      const sorted = [...arr].sort((a,b)=>a-b);
+      sorted.shift(); // drop best
+      sorted.pop();   // drop worst
+      return sorted.reduce((a,b)=>a+b,0) / sorted.length;
+    };
+
+    let best = Infinity;
+    let totalSum = 0;
+
+    const rowsAsc = entriesAsc.map(([id, s]) => {
+      const t = Number(s.time); // ensure numeric
+      best = Math.min(best, t);
+      totalSum += t;
+
+      pushAndTrim(ao5Window, t, 5);
+      pushAndTrim(ao12Window, t, 12);
+
       return {
         id,
-        ...solve,
-        ...stats,
+        ...s,
+        ao5: ao5Window.length === 5 ? trimmedAvg(ao5Window) : null,
+        ao12: ao12Window.length === 12 ? trimmedAvg(ao12Window) : null,
       };
     });
+
+    // 3) produce table in reverse (latest first) without re-sorting again
+    const tableData = rowsAsc.slice().reverse();
+
+    return {
+      bestSingle: isFinite(best) ? best : null,
+      currentAo5: rowsAsc.length ? rowsAsc.at(-1).ao5 : null,
+      currentAo12: rowsAsc.length ? rowsAsc.at(-1).ao12 : null,
+      currentAverage: rowsAsc.length ? totalSum / rowsAsc.length : null,
+      tableData,
+    };
+  }, [solveTimes]);
 
   return (
     <div className="min-h-[calc(100vh-4rem)] w-full bg-gradient-to-br from-blue-900 via-gray-500 to-red-900 text-white p-6">

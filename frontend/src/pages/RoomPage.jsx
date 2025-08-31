@@ -74,8 +74,8 @@ function RoomPage() {
     useState(false);
   const [allWeeklyLeaderboardData, setAllWeeklyLeaderboardData] = useState([]);
   const [isNewWeek, setIsNewWeek] = useState(false);
-  const [previousWeekLeaderboardData, setPreviousWeekLeaderboardData] =
-    useState([]);
+  // const [previousWeekLeaderboardData, setPreviousWeekLeaderboardData] =
+  //   useState([]);
   const [currentWeekStats, setCurrentWeekStats] = useState(null);
   const [showWeeklyStatsModal, setShowWeeklyStatsModal] = useState(false);
   const weeklyStatsTableRef = useRef(null);
@@ -226,14 +226,14 @@ function RoomPage() {
       const weekStartStr = currentWeekStart.toISOString().split("T")[0];
       if (todayStr === weekStartStr) {
         setIsNewWeek(true);
-        const previousWeekStart = new Date(
-          currentWeekStart.getTime() - 7 * 24 * 60 * 60 * 1000
-        );
-        const prevWeekData = (response || []).filter(
-          (item) =>
-            new Date(item.weekStart).getTime() === previousWeekStart.getTime()
-        );
-        setPreviousWeekLeaderboardData(prevWeekData);
+        // const previousWeekStart = new Date(
+        //   currentWeekStart.getTime() - 7 * 24 * 60 * 60 * 1000
+        // );
+        // const prevWeekData = (response || []).filter(
+        //   (item) =>
+        //     new Date(item.weekStart).getTime() === previousWeekStart.getTime()
+        // );
+        // setPreviousWeekLeaderboardData(prevWeekData);
       }
     } catch (error) {
       console.error("Failed to fetch weekly leaderboard:", error);
@@ -799,7 +799,12 @@ function RoomPage() {
 
   // Previous week leaderboard popup modal
   // Weekly Leaderboard popup modal
-  if (isNewWeek && previousWeekLeaderboardData) {
+  if (isNewWeek && currentWeekStats) {
+    // sort players by points (highest first)
+    const sortedPlayers = [...currentWeekStats.players].sort(
+      (a, b) => b.points - a.points
+    );
+
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
         <div className="bg-white rounded-lg shadow-xl p-4 sm:p-8 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -813,18 +818,18 @@ function RoomPage() {
             </p>
           </div>
 
-          {previousWeekLeaderboardData.length > 0 ? (
+          {sortedPlayers.length > 0 ? (
             <div className="space-y-4 mb-6">
               <p className="text-green-600 font-medium text-sm mb-4">
                 🎉 Congratulations{" "}
                 <span className="font-semibold">
-                  {previousWeekLeaderboardData[0].playerName}
+                  {sortedPlayers[0].playerName}
                 </span>{" "}
                 for topping the leaderboard!
               </p>
-              {previousWeekLeaderboardData.map((player, index) => (
+              {sortedPlayers.map((player, index) => (
                 <div
-                  key={`${player.roomCode}-${player.playerName}`}
+                  key={`${roomCode}-${player.playerName}`}
                   className={`flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 rounded-lg border ${
                     index === 0
                       ? "bg-yellow-50 border-yellow-200"
@@ -854,8 +859,10 @@ function RoomPage() {
                         {player.playerName}
                       </div>
                       <div className="text-sm text-gray-600">
-                        {player.weekStart &&
-                          new Date(player.weekStart).toLocaleDateString()}
+                        {currentWeekStats.weekStart &&
+                          new Date(
+                            currentWeekStats.weekStart
+                          ).toLocaleDateString()}
                       </div>
                     </div>
                   </div>
@@ -863,25 +870,25 @@ function RoomPage() {
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 text-sm">
                       <div className="text-center">
                         <div className="font-semibold text-green-600">
-                          {player.weeklyPoints || 0}
+                          {player.points || 0}
                         </div>
                         <div className="text-gray-500">Points</div>
                       </div>
                       <div className="text-center">
                         <div className="font-semibold text-orange-600">
-                          {player.bestSingle || "--:--"}
+                          {player.bestSolve || "--:--"}
                         </div>
                         <div className="text-gray-500">Single</div>
                       </div>
                       <div className="text-center">
                         <div className="font-semibold text-blue-600">
-                          {player.ao5 || "--:--"}
+                          {player.bestAo5 || "--:--"}
                         </div>
                         <div className="text-gray-500">AO5</div>
                       </div>
                       <div className="text-center">
                         <div className="font-semibold text-purple-600">
-                          {player.ao12 || "--:--"}
+                          {player.bestAo12 || "--:--"}
                         </div>
                         <div className="text-gray-500">AO12</div>
                       </div>

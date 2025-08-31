@@ -679,6 +679,13 @@ function RoomPage() {
     navigate("/battles-home");
   };
 
+  useEffect(() => {
+    const preventContextMenu = (e) => e.preventDefault();
+    document.addEventListener("contextmenu", preventContextMenu);
+    return () =>
+      document.removeEventListener("contextmenu", preventContextMenu);
+  }, []);
+
   // Daily Leaderboard popup modal
   if (showLeaderboardPopup) {
     return (
@@ -932,13 +939,23 @@ function RoomPage() {
             </div>
           </div>
 
-          <div className="mb-6">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">
-              Scramble {activeScramble + 1}
-            </h2>
-            <div className="font-mono text-lg text-gray-700 bg-gray-100 px-4 py-2 rounded mb-6">
+          <div
+            className="mb-6 flex flex-col sm:flex-row items-center justify-center gap-4"
+            style={{
+              WebkitUserSelect: "none",
+              userSelect: "none",
+              WebkitTouchCallout: "none", // ← blocks the Samsung long-press menu
+            }}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+          >
+            <div className="font-mono text-lg text-gray-700 bg-gray-100 px-4 py-2 rounded flex-1">
               {scrambles[activeScramble]}
             </div>
+            <scramble-display
+              scramble={scrambles[activeScramble]}
+              style={{ width: "100px", height: "80px", flexShrink: 0 }}
+            ></scramble-display>
           </div>
 
           {/* Touch-enabled timer area */}

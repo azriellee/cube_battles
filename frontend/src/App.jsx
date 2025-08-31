@@ -5,6 +5,7 @@ import {
   BattlesHomePage,
   HomePage,
   PracticeModePage,
+  LibTest,
 } from "./pages";
 import { Navigate } from "react-router-dom";
 
@@ -24,6 +25,7 @@ function App() {
                 <Route path="/practice-mode" element={<PracticeModePage />} />
                 <Route path="/battles-home" element={<BattlesHomePage />} />
                 <Route path="/room/:roomCode" element={<RoomPage />} />
+                <Route path="/libtest" element={<LibTest />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </ProtectedLayout>

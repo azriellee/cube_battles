@@ -1,12 +1,16 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import { Trash2, Eye, RotateCcw } from "lucide-react";
 import {
   savePracticeTimesToStorage,
   loadPracticeTimesFromStorage,
 } from "../services/storage";
-import {
-  formatTime
-} from "../services/metrics";
+import { formatTime } from "../services/metrics";
 import { getScramble } from "../services/scramble";
 import { useNavigate } from "react-router-dom";
 import { useIsMobile } from "../services/hooks/useIsMobile";
@@ -295,58 +299,62 @@ function PracticeModePage() {
   //   });
 
   const { bestSingle, currentAo5, currentAo12, currentAverage, tableData } =
-  useMemo(() => {
-    // 1) get solves once, in timestamp order
-    const entriesAsc = Object.entries(solveTimes)
-      .sort(([, a], [, b]) => a.timestamp - b.timestamp);
+    useMemo(() => {
+      // 1) get solves once, in timestamp order
+      const entriesAsc = Object.entries(solveTimes).sort(
+        ([, a], [, b]) => a.timestamp - b.timestamp
+      );
 
-    // 2) one pass: compute rolling Ao5/Ao12 so we avoid O(n²)
-    const ao5Window = [];
-    const ao12Window = [];
-    const pushAndTrim = (arr, v, max) => { arr.push(v); if (arr.length > max) arr.shift(); };
+      // 2) one pass: compute rolling Ao5/Ao12 so we avoid O(n²)
+      const ao5Window = [];
+      const ao12Window = [];
+      const pushAndTrim = (arr, v, max) => {
+        arr.push(v);
+        if (arr.length > max) arr.shift();
+      };
 
-    // helper to compute trimmed mean (drop fastest/slowest) for WCA-like aoN
-    const trimmedAvg = (arr) => {
-      if (!arr || arr.length < 3) return null;
-      const sorted = [...arr].sort((a,b)=>a-b);
-      sorted.shift(); // drop best
-      sorted.pop();   // drop worst
-      return sorted.reduce((a,b)=>a+b,0) / sorted.length;
-    };
+      // helper to compute trimmed mean (drop fastest/slowest) for WCA-like aoN
+      const trimmedAvg = (arr) => {
+        if (!arr || arr.length < 3) return null;
+        const sorted = [...arr].sort((a, b) => a - b);
+        sorted.shift(); // drop best
+        sorted.pop(); // drop worst
+        return sorted.reduce((a, b) => a + b, 0) / sorted.length;
+      };
 
-    let best = Infinity;
-    let totalSum = 0;
+      let best = Infinity;
+      let totalSum = 0;
 
-    const rowsAsc = entriesAsc.map(([id, s]) => {
-      const t = Number(s.time); // ensure numeric
-      best = Math.min(best, t);
-      totalSum += t;
+      const rowsAsc = entriesAsc.map(([id, s]) => {
+        const t = Number(s.time); // ensure numeric
+        best = Math.min(best, t);
+        totalSum += t;
 
-      pushAndTrim(ao5Window, t, 5);
-      pushAndTrim(ao12Window, t, 12);
+        pushAndTrim(ao5Window, t, 5);
+        pushAndTrim(ao12Window, t, 12);
+
+        return {
+          id,
+          ...s,
+          ao5: ao5Window.length === 5 ? trimmedAvg(ao5Window) : null,
+          ao12: ao12Window.length === 12 ? trimmedAvg(ao12Window) : null,
+        };
+      });
+
+      // 3) produce table in reverse (latest first) without re-sorting again
+      const tableData = rowsAsc.slice().reverse();
 
       return {
-        id,
-        ...s,
-        ao5: ao5Window.length === 5 ? trimmedAvg(ao5Window) : null,
-        ao12: ao12Window.length === 12 ? trimmedAvg(ao12Window) : null,
+        bestSingle: isFinite(best) ? best : null,
+        currentAo5: rowsAsc.length ? rowsAsc.at(-1).ao5 : null,
+        currentAo12: rowsAsc.length ? rowsAsc.at(-1).ao12 : null,
+        currentAverage: rowsAsc.length ? totalSum / rowsAsc.length : null,
+        tableData,
       };
-    });
-
-    // 3) produce table in reverse (latest first) without re-sorting again
-    const tableData = rowsAsc.slice().reverse();
-
-    return {
-      bestSingle: isFinite(best) ? best : null,
-      currentAo5: rowsAsc.length ? rowsAsc.at(-1).ao5 : null,
-      currentAo12: rowsAsc.length ? rowsAsc.at(-1).ao12 : null,
-      currentAverage: rowsAsc.length ? totalSum / rowsAsc.length : null,
-      tableData,
-    };
-  }, [solveTimes]);
+    }, [solveTimes]);
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] w-full bg-gradient-to-br from-blue-900 via-gray-500 to-red-900 text-white p-6">
+    <div className="h-[100svh] w-full overflow-hidden bg-gradient-to-br from-blue-900 via-gray-500 to-red-900 text-white p-3 sm:p-6">
       <div className="max-w-7xl mx-auto">
         {/* Top bar */}
         <div className="mb-6 flex gap-3 flex-wrap">
@@ -365,7 +373,7 @@ function PracticeModePage() {
             </button>
           )}
         </div>
-        <div className="flex gap-8">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-8 h-full">
           {/* Left Column - Table (desktop only) */}
           {!isMobile && (
             <div className="w-80 flex-shrink-0">
@@ -432,22 +440,27 @@ function PracticeModePage() {
 
           {/* Right Column - Timer */}
           <div
-            className="flex-1 flex flex-col items-center justify-center"
+            className="flex-1 flex flex-col items-center justify-start sm:justify-center overflow-hidden"
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
           >
-            {/* Scramble */}
-            <div className="mb-6 text-center w-full">
-              <div className="text-base sm:text-lg font-mono bg-gray-800 p-3 sm:p-4 rounded-lg w-full max-w-full sm:max-w-2xl mx-auto break-words">
+            {/* Scramble (wrap + responsive sizes) */}
+            <div className="mb-3 sm:mb-6 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 w-full px-1">
+              <div className="text-sm sm:text-lg font-mono bg-gray-800 p-2 sm:p-3 rounded-lg w-full max-w-2xl break-words">
                 {currentScramble}
               </div>
+              <scramble-display
+                scramble={currentScramble}
+                style={{ width: "80px", height: "80px" }}
+                class="sm:w-[120px] sm:h-[120px]"
+              ></scramble-display>
             </div>
 
-            {/* Timer Container with background */}
-            <div className="bg-gray-800 rounded-xl p-6 sm:p-12 mb-6 shadow-lg w-full max-w-full sm:max-w-2xl mx-auto flex flex-col justify-center min-h-[180px] sm:h-[300px]">
-              <div className="select-none text-center flex-1 flex flex-col justify-center">
+            {/* Timer card */}
+            <div className="bg-gray-800 rounded-xl p-4 sm:p-12 mb-3 sm:mb-6 shadow-lg w-full max-w-full sm:max-w-2xl mx-auto flex flex-col justify-center min-h-[140px]">
+              <div className="select-none text-center flex-1 flex flex-col justify-center px-1 overflow-hidden">
                 <div
-                  className={`font-mono font-bold mb-4 sm:mb-6 leading-none ${
+                  className={`font-mono font-bold mb-3 sm:mb-6 leading-none ${
                     isTimerActive
                       ? "text-green-600"
                       : isHoldingSpace
@@ -455,12 +468,12 @@ function PracticeModePage() {
                         ? "text-green-500"
                         : "text-red-500"
                       : "text-white"
-                  } text-7xl sm:text-8xl`} // responsive font size
+                  } text-[clamp(40px,12vw,96px)]`}
                 >
                   {formatTime(currentTime.toFixed(2))}
                 </div>
 
-                <div className="text-gray-400 h-6 flex items-center justify-center text-xs sm:text-sm text-center px-2">
+                <div className="text-gray-400 h-5 sm:h-6 flex items-center justify-center text-[11px] sm:text-sm text-center px-2">
                   {!isTimerActive &&
                     !isHoldingSpace &&
                     "Hold SPACEBAR or TOUCH & HOLD to prepare, release to start"}
@@ -471,29 +484,29 @@ function PracticeModePage() {
               </div>
             </div>
 
-            {/* Statistics */}
-            <div className="flex flex-wrap gap-4 justify-center">
-              <div className="bg-gray-800 p-3 sm:p-4 rounded-lg min-w-[80px] text-center">
+            {/* Stats: wrap tightly on small screens */}
+            <div className="flex flex-wrap gap-2 sm:gap-4 justify-center px-1">
+              <div className="bg-gray-800 p-2 sm:p-4 rounded-lg min-w-[70px] text-center">
                 <div className="text-gray-400 text-xs sm:text-sm">Best</div>
-                <div className="text-xl sm:text-2xl font-bold">
+                <div className="text-lg sm:text-2xl font-bold">
                   {formatTime(bestSingle) || "-"}
                 </div>
               </div>
-              <div className="bg-gray-800 p-3 sm:p-4 rounded-lg min-w-[80px] text-center">
+              <div className="bg-gray-800 p-2 sm:p-4 rounded-lg min-w-[70px] text-center">
                 <div className="text-gray-400 text-xs sm:text-sm">Ao5</div>
-                <div className="text-xl sm:text-2xl font-bold">
+                <div className="text-lg sm:text-2xl font-bold">
                   {formatTime(currentAo5) || "-"}
                 </div>
               </div>
-              <div className="bg-gray-800 p-3 sm:p-4 rounded-lg min-w-[80px] text-center">
+              <div className="bg-gray-800 p-2 sm:p-4 rounded-lg min-w-[70px] text-center">
                 <div className="text-gray-400 text-xs sm:text-sm">Ao12</div>
-                <div className="text-xl sm:text-2xl font-bold">
+                <div className="text-lg sm:text-2xl font-bold">
                   {formatTime(currentAo12) || "-"}
                 </div>
               </div>
-              <div className="bg-gray-800 p-3 sm:p-4 rounded-lg min-w-[80px] text-center">
+              <div className="bg-gray-800 p-2 sm:p-4 rounded-lg min-w-[70px] text-center">
                 <div className="text-gray-400 text-xs sm:text-sm">Average</div>
-                <div className="text-xl sm:text-2xl font-bold">
+                <div className="text-lg sm:text-2xl font-bold">
                   {formatTime(currentAverage) || "-"}
                 </div>
               </div>

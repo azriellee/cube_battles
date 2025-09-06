@@ -259,45 +259,6 @@ function PracticeModePage() {
     setShowScrambleModal(true);
   };
 
-  // Calculate statistics for each solve
-  // const calculateStatsForSolve = (solveId) => {
-  //   const solveIds = Object.keys(solveTimes).sort(
-  //     (a, b) => solveTimes[a].timestamp - solveTimes[b].timestamp
-  //   );
-  //   const solveIndex = solveIds.indexOf(solveId);
-
-  //   if (solveIndex === -1) return { ao5: null, ao12: null };
-
-  //   // Get solves up to this point (inclusive)
-  //   const solvesUpToHere = {};
-  //   for (let i = 0; i <= solveIndex; i++) {
-  //     solvesUpToHere[solveIds[i]] = solveTimes[solveIds[i]];
-  //   }
-
-  //   return {
-  //     ao5: calculateAverage(solvesUpToHere, 5),
-  //     ao12: calculateAverage(solvesUpToHere, 12),
-  //   };
-  // };
-
-  // Get current statistics
-  // const bestSingle = getBestSingle(solveTimes);
-  // const currentAo5 = calculateAverage(solveTimes, 5);
-  // const currentAo12 = calculateAverage(solveTimes, 12);
-  // const currentAverage = calculateTotalAverage(solveTimes);
-
-  // // Prepare table data
-  // const tableData = Object.entries(solveTimes)
-  //   .sort(([, a], [, b]) => b.timestamp - a.timestamp)
-  //   .map(([id, solve]) => {
-  //     const stats = calculateStatsForSolve(id);
-  //     return {
-  //       id,
-  //       ...solve,
-  //       ...stats,
-  //     };
-  //   });
-
   const { bestSingle, currentAo5, currentAo12, currentAverage, tableData } =
     useMemo(() => {
       // 1) get solves once, in timestamp order
@@ -380,7 +341,13 @@ function PracticeModePage() {
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-bold">Solve Times</h2>
                 <button
-                  onClick={clearAllSolves}
+                  onClick={() => {
+                    const confirmed = window.confirm(
+                      `Do you want to clear solve history?`
+                    );
+                    if (!confirmed) return;
+                    clearAllSolves();
+                  }}
                   className="p-2 bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
                   title="Clear all solves"
                 >
@@ -521,7 +488,13 @@ function PracticeModePage() {
               <div className="flex justify-between items-center p-4 border-b border-gray-700">
                 <h2 className="text-lg font-bold">Solve History</h2>
                 <button
-                  onClick={clearAllSolves}
+                  onClick={() => {
+                    const confirmed = window.confirm(
+                      `Do you want to clear solve history?`
+                    );
+                    if (!confirmed) return;
+                    clearAllSolves();
+                  }}
                   className="p-3 bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
                   title="Clear all solves"
                 >

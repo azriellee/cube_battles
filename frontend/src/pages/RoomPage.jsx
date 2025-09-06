@@ -7,6 +7,7 @@ import {
   getTodayStats,
   getWeeklyLeaderboard,
   updatePlayerDetails,
+  getWeeklyBestStats,
 } from "../services/api";
 import {
   saveScramblesToStorage,
@@ -21,6 +22,8 @@ import {
   getWeeklyLeaderboardFromStorage,
   getSubmissionStatusFromStorage,
   saveSubmissionStatusToStorage,
+  saveWeeklyBestStatsToStorage,
+  getWeeklyBestStatsFromStorage,
 } from "../services/storage";
 import {
   formatTime,
@@ -72,10 +75,8 @@ function RoomPage() {
   const [weeklyLeaderboardData, setWeeklyLeaderboardData] = useState([]);
   const [isLoadingWeeklyLeaderboard, setIsLoadingWeeklyLeaderboard] =
     useState(false);
-  const [allWeeklyLeaderboardData, setAllWeeklyLeaderboardData] = useState([]);
+  const [allWeeklyBestStats, setAllWeeklyBestStats] = useState([]);
   const [isNewWeek, setIsNewWeek] = useState(false);
-  // const [previousWeekLeaderboardData, setPreviousWeekLeaderboardData] =
-  //   useState([]);
   const [currentWeekStats, setCurrentWeekStats] = useState(null);
   const [showWeeklyStatsModal, setShowWeeklyStatsModal] = useState(false);
   const weeklyStatsTableRef = useRef(null);
@@ -207,8 +208,6 @@ function RoomPage() {
     setIsLoadingWeeklyLeaderboard(true);
     try {
       const response = await getWeeklyLeaderboard(roomCode);
-      setAllWeeklyLeaderboardData(response || []);
-
       // Filter for current week
       const today = new Date();
       const currentWeekStart = getWeekStart(today);
@@ -226,14 +225,6 @@ function RoomPage() {
       const weekStartStr = currentWeekStart.toISOString().split("T")[0];
       if (todayStr === weekStartStr) {
         setIsNewWeek(true);
-        // const previousWeekStart = new Date(
-        //   currentWeekStart.getTime() - 7 * 24 * 60 * 60 * 1000
-        // );
-        // const prevWeekData = (response || []).filter(
-        //   (item) =>
-        //     new Date(item.weekStart).getTime() === previousWeekStart.getTime()
-        // );
-        // setPreviousWeekLeaderboardData(prevWeekData);
       }
     } catch (error) {
       console.error("Failed to fetch weekly leaderboard:", error);
@@ -241,8 +232,6 @@ function RoomPage() {
       // Try to load from local storage as fallback
       const storedLeaderboard = getWeeklyLeaderboardFromStorage(roomCode);
       if (storedLeaderboard !== null && storedLeaderboard !== undefined) {
-        setAllWeeklyLeaderboardData(storedLeaderboard);
-
         // Filter for current week
         const currentWeekStart = getWeekStart(new Date());
         const currentWeekData = storedLeaderboard.filter(
@@ -296,6 +285,48 @@ function RoomPage() {
     }
   }, [roomCode]);
 
+  const fetchWeeklyBestStats = async () => {
+    if (!roomCode) return;
+
+    setIsLoading(true);
+    try {
+      const response = await getWeeklyBestStats(roomCode);
+      setAllWeeklyBestStats(response || []);
+
+      const currentWeekStart = getWeekStart(new Date());
+      const currentWeekData = (response || []).find(
+        (item) =>
+          new Date(item.weekStart).getTime() === currentWeekStart.getTime()
+      );
+
+      setCurrentWeekStats(currentWeekData || null);
+      // Save to local storage
+      saveWeeklyBestStatsToStorage(roomCode, response || []);
+    } catch (error) {
+      console.error("Failed to fetch weekly best stats:", error);
+
+      // Try to load from local storage as fallback
+      const storedStats = getWeeklyBestStatsFromStorage(roomCode);
+      if (storedStats !== null && storedStats !== undefined) {
+        setAllWeeklyBestStats(storedStats);
+
+        // Filter for current week
+        const currentWeekStart = getWeekStart(new Date());
+        const currentWeekData = storedStats.find(
+          (item) =>
+            new Date(item.weekStart).getTime() === currentWeekStart.getTime()
+        );
+        setCurrentWeekStats(currentWeekData || null);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchWeeklyBestStats();
+  }, [roomCode]);
+
   // Function to submit statistics when all solves are complete
   const submitStatistics = async (solveTimes) => {
     if (statisticsSubmitted || isSubmitting) return; // prevent duplicate submissions
@@ -306,10 +337,12 @@ function RoomPage() {
       const finalBestSingle = getBestSingle(solveTimes);
       const finalAO5 = bestAO5 || calculateAverage(solveTimes, 5);
       const finalAO12 = bestAO12 || calculateAverage(solveTimes, 12);
-      const totalTime = Object.values(solveTimes).reduce(
-        (sum, solve) => sum + solve.time,
-        0
-      );
+
+      const validSolves = Object.values(solveTimes)
+        .map((s) => Number(s.time))
+        .filter(Number.isFinite);
+
+      const totalTime = validSolves.reduce((sum, t) => sum + t, 0);
 
       await sendPlayerStatistics(
         roomCode,
@@ -322,7 +355,7 @@ function RoomPage() {
 
       await updatePlayerDetails({
         playerName: username,
-        numSolves: completedSolves,
+        numSolves: validSolves.length,
         totalTime,
         bestAo5: finalAO5,
         bestAo12: finalAO12,
@@ -922,6 +955,9 @@ function RoomPage() {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
         <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-2xl mx-4 text-center">
+          <h2 className="text-xl font-bold text-gray-800 mb-4">
+            Scramble {activeScramble + 1}
+          </h2>
           {/* Stats bar */}
           <div className="mb-8">
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
@@ -1756,11 +1792,11 @@ function RoomPage() {
             </div>
             <div className="flex-1 overflow-y-auto p-6">
               <WeeklyBestStatsTable
-                ref={weeklyStatsTableRef}
-                roomCode={roomCode}
+                data={allWeeklyBestStats}
                 formatTime={formatTime}
                 getWeekStart={getWeekStart}
-                onStatsUpdate={handleStatsUpdate}
+                currentWeekStart={getWeekStart(new Date())}
+                isLoading={isLoading}
               />
             </div>
           </div>
